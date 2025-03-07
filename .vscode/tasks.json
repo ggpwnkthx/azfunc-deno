@@ -18,7 +18,6 @@
       "command": "host start",
       "isBackground": true,
       "dependsOn": "deno clean (functions)",
-      "dependsOrder": "sequence"
     }
   ]
 }

@@ -14,5 +14,5 @@
     }
   },
   "workspaceFolder": "/home/site/wwwroot",
-  "postCreateCommand": "/home/site/wwwroot/.deno/install.sh"
+  "postCreateCommand": "${containerWorkspaceFolder}/.deno/install.sh"
 }

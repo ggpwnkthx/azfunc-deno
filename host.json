@@ -15,8 +15,7 @@
   "fileWatchingEnabled": false,
   "customHandler": {
     "description": {
-      "defaultExecutablePath": "/home/site/wwwroot/.deno/handler.sh",
-      "workingDirectory": "/home/site/wwwroot"
+      "defaultExecutablePath": ".deno/handler.sh"
     },
     "enableForwardingHttpRequest": true
   }
