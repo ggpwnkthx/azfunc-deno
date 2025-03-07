@@ -1,0 +1,17 @@
+{
+  "imports": {
+    "@azure/functions": "npm:@azure/functions@^4.0.0"
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 80,
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": false,
+    "proseWrap": "always"
+  },
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "fullclean": "deno clean && rm -r node_modules"
+  }
+}

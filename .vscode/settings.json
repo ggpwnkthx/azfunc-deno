@@ -1,0 +1,21 @@
+{
+  "azureFunctions.deploySubpath": ".",
+  "azureFunctions.projectLanguage": "TypeScript",
+  "azureFunctions.projectLanguageModel": 4,
+  "azureFunctions.projectRuntime": "~4",
+  "debug.internalConsoleOptions": "neverOpen",
+  "deno.enable": true,
+  "deno.lint": true,
+  "deno.unstable": [],
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.defaultFormatter": "denoland.vscode-deno",
+  "notebook.defaultFormatter": "denoland.vscode-deno",
+  "notebook.displayOrder": [
+    "text/html"
+  ],
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  }
+}
