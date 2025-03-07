@@ -3,7 +3,6 @@
     "ms-azuretools.vscode-azurefunctions",
     "denoland.vscode-deno",
     "justjavac.vscode-deno-extensionpack",
-    "ms-python.black-formatter",
     "vscode-icons-team.vscode-icons"
   ]
 }

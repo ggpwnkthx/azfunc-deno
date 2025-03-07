@@ -10,8 +10,5 @@
     "singleQuote": false,
     "proseWrap": "always"
   },
-  "nodeModulesDir": "auto",
-  "tasks": {
-    "fullclean": "deno clean && rm -r node_modules"
-  }
+  "nodeModulesDir": "auto"
 }

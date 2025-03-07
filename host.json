@@ -12,11 +12,12 @@
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
     "version": "[4.*, 5.0.0)"
   },
-  "fileWatchingEnabled": false,
   "customHandler": {
     "description": {
-      "defaultExecutablePath": ".deno/handler.sh"
+      "defaultExecutablePath": ".deno/handler.sh",
+      "arguments": ["-A", "serve.ts"]
     },
     "enableForwardingHttpRequest": true
-  }
+  },
+  "fileWatchingEnabled": false
 }

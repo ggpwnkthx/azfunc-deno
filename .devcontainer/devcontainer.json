@@ -2,17 +2,19 @@
   "name": "Azure Functions Deno Custom Handler",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
+  "containerEnv": {
+    "AzureFunctionsJobHost__Logging__Console__IsEnabled": "true"
+  },
   "customizations": {
     "vscode": {
       "extensions": [
 		    "ms-azuretools.vscode-azurefunctions",
         "denoland.vscode-deno",
         "justjavac.vscode-deno-extensionpack",
-        "ms-python.black-formatter",
         "vscode-icons-team.vscode-icons"
       ]
     }
-  },
+  }, 
   "workspaceFolder": "/home/site/wwwroot",
-  "postCreateCommand": "${containerWorkspaceFolder}/.deno/install.sh"
+  "postCreateCommand": "${containerWorkspaceFolder}/.deno/bootstrap.sh"
 }

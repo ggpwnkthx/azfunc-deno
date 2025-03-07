@@ -3,21 +3,15 @@
   "tasks": [
     {
       "type": "shell",
-      "label": "deno install (functions)",
-      "command": "deno install"
-    },
-    {
-      "type": "shell",
-      "label": "deno clean (functions)",
-      "command": "deno task fullclean",
-      "dependsOn": "deno install (functions)"
+      "label": "deno bootstrap",
+      "command": ".deno/bootstrap.sh",
     },
     {
       "type": "func",
-      "label": "func: host start",
-      "command": "host start",
+      "label": "start azfunc",
+      "command": "host start --verbose",
       "isBackground": true,
-      "dependsOn": "deno clean (functions)",
+      "dependsOn": "deno bootstrap",
     }
   ]
 }

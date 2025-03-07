@@ -1,6 +1,6 @@
 {
   "azureFunctions.deploySubpath": ".",
-  "azureFunctions.projectLanguage": "TypeScript",
+  "azureFunctions.projectLanguage": "Custom",
   "azureFunctions.projectLanguageModel": 4,
   "azureFunctions.projectRuntime": "~4",
   "debug.internalConsoleOptions": "neverOpen",
@@ -14,8 +14,5 @@
   "notebook.displayOrder": [
     "text/html"
   ],
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter"
-  }
+  "typescript.tsdk": "node_modules/typescript/lib"
 }
