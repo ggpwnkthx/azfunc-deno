@@ -2,16 +2,10 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "type": "shell",
-      "label": "deno bootstrap",
-      "command": ".deno/bootstrap.sh",
-    },
-    {
       "type": "func",
       "label": "start azfunc",
-      "command": "host start --verbose",
+      "command": "host start",
       "isBackground": true,
-      "dependsOn": "deno bootstrap",
     }
   ]
 }

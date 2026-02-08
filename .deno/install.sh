@@ -34,7 +34,7 @@ if [ ! -f "$SCRIPT_DIR/deno" ]; then
   fi
 
   # Download the Deno binary archive.
-  "$SCRIPT_DIR/fetch.sh" "https://github.com/denoland/deno/releases/download/v2.2.3/deno-x86_64-unknown-linux-gnu.zip" > "$SCRIPT_DIR/deno.zip"
+  "$SCRIPT_DIR/fetch.sh" "https://github.com/denoland/deno/releases/download/v2.6.8/deno-x86_64-unknown-linux-gnu.zip" > "$SCRIPT_DIR/deno.zip"
 
   # Extract the archive using the chosen extraction command.
   if [ "$UNZIP_CMD" = "unzip" ]; then

@@ -1,20 +1,33 @@
 {
   "name": "Azure Functions Deno Custom Handler",
-  "dockerComposeFile": "docker-compose.yml",
-  "service": "app",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "initializeCommand": "sh -c 'ENVFILE=\"${localWorkspaceFolder}/.env\"; if [ ! -f \"$ENVFILE\" ]; then umask 000; : > \"$ENVFILE\"; chmod 666 \"$ENVFILE\"; fi'",
+  "runArgs": [
+    "--env-file",
+    "${localWorkspaceFolder}/.env"
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder},target=/home/site/wwwroot,type=bind,consistency=cached",
+  "workspaceFolder": "/home/site/wwwroot",
   "containerEnv": {
     "AzureFunctionsJobHost__Logging__Console__IsEnabled": "true"
   },
   "customizations": {
     "vscode": {
       "extensions": [
-		    "ms-azuretools.vscode-azurefunctions",
         "denoland.vscode-deno",
         "justjavac.vscode-deno-extensionpack",
-        "vscode-icons-team.vscode-icons"
+        "vscode-icons-team.vscode-icons",
+        "ms-azuretools.vscode-azurefunctions"
       ]
     }
-  }, 
-  "workspaceFolder": "/home/site/wwwroot",
-  "postCreateCommand": "${containerWorkspaceFolder}/.deno/bootstrap.sh"
+  },
+  "features": {
+    "ghcr.io/jlaundry/devcontainer-features/azure-functions-core-tools:1": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/dotnet:2": {},
+    "ghcr.io/stu-bell/devcontainer-features/claude-code:0": {}
+  },
+  "postCreateCommand": ".deno/bootstrap.sh && chmod +x /usr/lib/azure-functions-core-tools/in-proc8/func"
 }

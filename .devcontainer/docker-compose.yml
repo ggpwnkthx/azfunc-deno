@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    volumes:
+      - ..:/home/site/wwwroot:cached
     platform: linux/amd64
     command: sleep infinity
     network_mode: service:azurite

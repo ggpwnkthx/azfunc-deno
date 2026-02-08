@@ -15,9 +15,8 @@
   "customHandler": {
     "description": {
       "defaultExecutablePath": ".deno/handler.sh",
-      "arguments": ["-A", "serve.ts"]
+      "arguments": ["serve.ts"]
     },
     "enableForwardingHttpRequest": true
-  },
-  "fileWatchingEnabled": false
+  }
 }
