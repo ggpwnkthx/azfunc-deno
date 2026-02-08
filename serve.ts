@@ -1,6 +1,9 @@
 export default {
   fetch(request: Request) {
-    if (request.url.startsWith("/json")) {
+    // Remove "/api" from path
+    const route = (new URL(request.url)).pathname.substring(4)
+
+    if (route === "/json") {
       return Response.json({ hello: "world" });
     }
 

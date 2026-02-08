@@ -1,7 +1,4 @@
 {
-  "imports": {
-    "@azure/functions": "npm:@azure/functions@^4"
-  },
   "fmt": {
     "useTabs": false,
     "lineWidth": 80,
@@ -10,5 +7,6 @@
     "singleQuote": false,
     "proseWrap": "always"
   },
-  "nodeModulesDir": "auto"
+  "nodeModulesDir": "auto",
+  "lock": false
 }
