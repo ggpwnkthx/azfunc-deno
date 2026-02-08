@@ -1,6 +1,6 @@
 {
   "imports": {
-    "@azure/functions": "npm:@azure/functions@^4.0.0"
+    "@azure/functions": "npm:@azure/functions@^4"
   },
   "fmt": {
     "useTabs": false,
