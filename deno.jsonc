@@ -1,4 +1,15 @@
 {
+  "compilerOptions": {
+    "strict": true
+  },
+  "tasks": {
+    // Writes ./<functionDir>/function.json for everything in src/functions/manifest.ts
+    "gen-function-json": "deno run --allow-read --allow-write src/bin/gen-function-json.ts",
+
+    // Runs the custom handler server
+    "serve": "deno run --allow-net --allow-env serve.ts",
+    "test": "deno test --allow-read --allow-write"
+  },
   "fmt": {
     "useTabs": false,
     "lineWidth": 80,
@@ -7,6 +18,5 @@
     "singleQuote": false,
     "proseWrap": "always"
   },
-  "nodeModulesDir": "auto",
   "lock": false
 }

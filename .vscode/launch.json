@@ -7,7 +7,7 @@
       "request": "attach",
       "cwd": "${workspaceFolder}",
       "port": 9229,
-      "preLaunchTask": "start azfunc",
+      "preLaunchTask": "start azfunc"
     }
   ]
 }

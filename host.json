@@ -6,7 +6,6 @@
     }
   },
   "customHandler": {
-    "enableForwardingHttpRequest": true,
     "description": {
       "defaultExecutablePath": ".deno/handler.sh",
       "arguments": ["serve.ts"]

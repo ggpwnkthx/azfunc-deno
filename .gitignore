@@ -49,3 +49,4 @@ __azurite_db*__.json
 
 # Deno binary
 .deno/deno
+*/function.json
