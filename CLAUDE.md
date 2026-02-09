@@ -10,7 +10,7 @@ Azure Functions v4 project using **Deno as a Custom Handler**. The Deno runtime 
 
 ```bash
 # Start Azure Functions host (runs Deno custom handler)
-func start
+FUNCTIONS_WORKER_RUNTIME=custom func start
 
 # Run Deno directly (port 8000) - useful for local development
 deno run -A --port 8000 serve.ts

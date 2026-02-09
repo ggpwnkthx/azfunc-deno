@@ -1,14 +1,19 @@
 {
   "version": "2.0",
-  "extensionBundle": {
-    "id": "Microsoft.Azure.Functions.ExtensionBundle",
-    "version": "[4.*, 5.0.0)"
+  "extensions": {
+    "http": {
+      "routePrefix": "api"
+    }
   },
   "customHandler": {
+    "enableForwardingHttpRequest": true,
     "description": {
       "defaultExecutablePath": ".deno/handler.sh",
-      "arguments": ["--watch", "serve.ts"]
-    },
-    "enableForwardingHttpRequest": true
+      "arguments": ["serve.ts"]
+    }
+  },
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.0.0, 5.0.0)"
   }
 }

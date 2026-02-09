@@ -2,10 +2,22 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "type": "func",
+      "type": "shell",
       "label": "start azfunc",
-      "command": "host start",
+      "command": "func host start",
       "isBackground": true,
+      "problemMatcher": {
+        "base": "$deno",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "^(.*Worker process started and initialized.)$"
+        }
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always"
+      }
     }
   ]
 }

@@ -11,7 +11,8 @@
   "workspaceMount": "source=${localWorkspaceFolder},target=/home/site/wwwroot,type=bind,consistency=cached",
   "workspaceFolder": "/home/site/wwwroot",
   "containerEnv": {
-    "AzureFunctionsJobHost__Logging__Console__IsEnabled": "true"
+    "AzureFunctionsJobHost__Logging__Console__IsEnabled": "true",
+    "AzureFunctionsDevelopmentEnvironment": "true"
   },
   "customizations": {
     "vscode": {
@@ -20,7 +21,11 @@
         "justjavac.vscode-deno-extensionpack",
         "vscode-icons-team.vscode-icons",
         "ms-azuretools.vscode-azurefunctions"
-      ]
+      ],
+      "settings": {
+        "task.autoDetect": "off",
+        "problemMatchers.autoDetect": "off"
+      }
     }
   },
   "features": {
