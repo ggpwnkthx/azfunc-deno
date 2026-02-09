@@ -1,6 +1,5 @@
-import { bindings } from "../src/azure/bindings.ts";
-import { defineTriggerFunction } from "../src/azure/define.ts";
-import { tryParseJson } from "../src/azure/lib/json.ts";
+import { bindings, defineTriggerFunction } from "@azure/functions";
+import { tryParseJson } from "../src/azure/functions/lib/json.ts";
 
 export const queueTrigger = defineTriggerFunction({
   dir: "queue_trigger",
@@ -18,7 +17,7 @@ export const queueTrigger = defineTriggerFunction({
       }),
     ],
   },
-  handler(payload) {
+  handler(payload: unknown) {
     const p = payload as { Data?: Record<string, unknown> };
 
     let queueItem: unknown = p.Data?.item ??

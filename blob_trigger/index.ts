@@ -1,5 +1,4 @@
-import { bindings } from "../src/azure/bindings.ts";
-import { defineTriggerFunction } from "../src/azure/define.ts";
+import { bindings, defineTriggerFunction } from "@azure/functions";
 
 export const blobTrigger = defineTriggerFunction({
   dir: "blob_trigger",
@@ -17,7 +16,7 @@ export const blobTrigger = defineTriggerFunction({
       }),
     ],
   },
-  handler(payload) {
+  handler(payload: unknown) {
     const p = payload as {
       Data?: { myBlob?: unknown };
       Metadata?: { blobTrigger?: string };

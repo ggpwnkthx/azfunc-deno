@@ -5,6 +5,7 @@ import type {
 } from "./define.ts";
 import { AppError, toErrorResponse } from "./lib/errors.ts";
 import { readJsonBodyLimited } from "./lib/json.ts";
+import { discoverFunctions } from "./scanner.ts";
 
 interface RouterOptions {
   /**
@@ -254,3 +255,9 @@ export function buildAzureFunctionsRouter(
     },
   };
 }
+
+export default buildAzureFunctionsRouter(await discoverFunctions(Deno.cwd()), {
+  routePrefix: Deno.env.get("AzureFunctionsJobHost__extensions__http__routePrefix") ??
+    Deno.env.get("FUNCTIONS_HTTP_ROUTE_PREFIX") ??
+    "api"
+});

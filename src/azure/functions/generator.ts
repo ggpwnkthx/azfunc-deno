@@ -2,6 +2,7 @@ import type { FunctionDefinition } from "./define.ts";
 import type { FunctionJson } from "./bindings.ts";
 import { joinPosix } from "./lib/path.ts";
 import { AppError } from "./lib/errors.ts";
+import { discoverFunctions } from "./scanner.ts";
 
 export interface GenerateOptions {
   /** Repo root where function folders live (default: Deno.cwd()) */
@@ -65,4 +66,9 @@ export async function writeFunctionJsonFiles(
   }
 
   return written;
+}
+
+if (import.meta.main) {
+  const functions = await discoverFunctions(Deno.cwd())
+  await writeFunctionJsonFiles(functions, { rootDir: Deno.cwd() })
 }

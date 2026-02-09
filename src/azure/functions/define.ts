@@ -22,9 +22,9 @@ export type HttpHandler =
   | ((req: Request) => HandlerResult)
   | ((req: Request, ctx: HttpContext) => HandlerResult);
 
-export type TriggerHandler =
-  | ((payload: unknown) => HandlerResult)
-  | ((payload: unknown, ctx: TriggerContext) => HandlerResult);
+export type TriggerHandler<T = unknown> =
+  | ((payload: T) => HandlerResult)
+  | ((payload: T, ctx: TriggerContext) => HandlerResult);
 
 export interface FunctionDefinitionBase {
   dir: string;
@@ -38,9 +38,9 @@ export interface HttpFunctionDefinition extends FunctionDefinitionBase {
   httpTrigger: HttpTriggerBinding;
 }
 
-export interface TriggerFunctionDefinition extends FunctionDefinitionBase {
+export interface TriggerFunctionDefinition<T = unknown> extends FunctionDefinitionBase {
   kind: "trigger";
-  handler: TriggerHandler;
+  handler: TriggerHandler<T>;
 }
 
 export type FunctionDefinition = HttpFunctionDefinition | TriggerFunctionDefinition;
@@ -100,11 +100,11 @@ export function defineHttpFunction(options: {
   };
 }
 
-export function defineTriggerFunction(options: {
+export function defineTriggerFunction<T = unknown>(options: {
   dir: string;
   functionJson: FunctionJson;
-  handler: TriggerHandler;
-}): TriggerFunctionDefinition {
+  handler: TriggerHandler<T>;
+}): TriggerFunctionDefinition<T> {
   assertValidDir(options.dir);
   assertValidFunctionJson(options.functionJson);
 

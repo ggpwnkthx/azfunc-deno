@@ -1,5 +1,4 @@
-import { bindings } from "../src/azure/bindings.ts";
-import { defineHttpFunction } from "../src/azure/define.ts";
+import { bindings, defineHttpFunction } from "@azure/functions";
 
 export const api = defineHttpFunction({
   dir: "api",
@@ -7,7 +6,6 @@ export const api = defineHttpFunction({
     bindings: [
       bindings.httpTrigger({
         name: "req",
-        // Catch-all so /api/foo/bar works (Azure style: {*name})
         route: "{*route}",
         authLevel: "anonymous",
       }),

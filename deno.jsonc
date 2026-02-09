@@ -2,13 +2,15 @@
   "compilerOptions": {
     "strict": true
   },
+  "imports": {
+    "@azure/functions": "./src/azure/functions/mod.ts"
+  },
   "tasks": {
     // Writes ./<functionDir>/function.json for everything in src/functions/manifest.ts
-    "gen-function-json": "deno run --allow-read --allow-write src/bin/gen-function-json.ts",
-
+    "gen": "deno run -A ./src/azure/functions/generator.ts",
     // Runs the custom handler server
-    "serve": "deno run --allow-net --allow-env serve.ts",
-    "test": "deno test --allow-read --allow-write"
+    "serve": "deno run -A serve.ts",
+    "dev": "deno run -A --watch serve.ts"
   },
   "fmt": {
     "useTabs": false,
