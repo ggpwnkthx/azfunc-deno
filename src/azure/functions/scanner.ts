@@ -2,15 +2,11 @@ import type { FunctionDefinition } from "./define.ts";
 import { joinPosix } from "./lib/path.ts";
 
 const SKIP_DIRS = new Set([
-  "node_modules",
   ".git",
   ".deno",
-  "dist",
-  "build",
-  "out",
+  "node_modules",
+  "src"
 ]);
-
-const CACHE_BUST = Date.now().toString(36);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
@@ -41,7 +37,6 @@ function toFileUrl(path: string): string {
   // This is intentionally simple (posix paths) since the rest of this codebase is posix-ish.
   const abs = path.startsWith("/") ? path : joinPosix(Deno.cwd(), path);
   const url = new URL(`file://${abs}`);
-  url.searchParams.set("v", CACHE_BUST);
   return url.href;
 }
 

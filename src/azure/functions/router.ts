@@ -17,6 +17,11 @@ interface RouterOptions {
   maxTriggerBodyBytes?: number;
 }
 
+export interface CreateRouterOptions extends RouterOptions {
+  /** Where function folders live (default: Deno.cwd()) */
+  rootDir?: string;
+}
+
 export interface AzureFunctionsRouter {
   handle(req: Request): Promise<Response>;
 }
@@ -70,7 +75,7 @@ function compileTemplate(template: string): {
   let specificity = 0;
 
   for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
+    const seg = segments[i]!;
 
     const catchAll = seg.match(/^\{\*([A-Za-z0-9_]+)\}$/);
     if (catchAll) {
@@ -80,7 +85,7 @@ function compileTemplate(template: string): {
           `Route template "${template}" has a catch-all segment not in the last position.`,
         );
       }
-      const name = catchAll[1];
+      const name = catchAll[1]!;
       paramNames.push(name);
       // allow empty catch-all
       parts.push("(?:/(.*))?");
@@ -90,7 +95,7 @@ function compileTemplate(template: string): {
 
     const optional = seg.match(/^\{([A-Za-z0-9_]+)\?\}$/);
     if (optional) {
-      const name = optional[1];
+      const name = optional[1]!;
       paramNames.push(name);
       parts.push("(?:/([^/]+))?");
       specificity += 1;
@@ -99,7 +104,7 @@ function compileTemplate(template: string): {
 
     const param = seg.match(/^\{([A-Za-z0-9_]+)\}$/);
     if (param) {
-      const name = param[1];
+      const name = param[1]!;
       paramNames.push(name);
       parts.push("/([^/]+)");
       specificity += 2;
@@ -145,11 +150,12 @@ function buildHttpRoutes(
   const routes: CompiledRoute[] = [];
 
   for (const fn of fns) {
-    const { regex, paramNames, specificity } = compileTemplate(
-      fn.httpTrigger.route,
-    );
+    // If route is omitted, Azure Functions defaults the route to the function name.
+    const routeTemplate = fn.httpTrigger.route ?? fn.dir;
+
+    const { regex, paramNames, specificity } = compileTemplate(routeTemplate);
     routes.push({
-      template: fn.httpTrigger.route,
+      template: routeTemplate,
       regex,
       paramNames,
       specificity,
@@ -170,6 +176,13 @@ function methodAllowed(
   if (!methods || methods.length === 0) return true;
   const rm = requestMethod.toUpperCase();
   return methods.some((m) => m.toUpperCase() === rm);
+}
+
+export function resolveRoutePrefixFromEnv(fallback = "api"): string {
+  // Azure uses double-underscore for nested config keys.
+  return Deno.env.get("AzureFunctionsJobHost__extensions__http__routePrefix") ??
+    Deno.env.get("FUNCTIONS_HTTP_ROUTE_PREFIX") ??
+    fallback;
 }
 
 export function buildAzureFunctionsRouter(
@@ -209,16 +222,15 @@ export function buildAzureFunctionsRouter(
           const triggerFn = triggerMap.get(functionName);
           if (triggerFn) {
             const payload = await readJsonBodyLimited(req, maxTriggerBodyBytes);
-            const res = await triggerFn.handler(payload, {
+            return await triggerFn.handler(payload, {
               functionDir: triggerFn.dir,
               rawPathname: pathname,
             });
-            return res;
           }
         }
 
-        // HTTP triggers: route based on function.json httpTrigger.route
-        const relA = stripPrefix(pathname, routePrefix); // e.g. "/api/users/1" -> "users/1"
+        // HTTP triggers: route based on function.json httpTrigger.route (or function name)
+        const relA = stripPrefix(pathname, routePrefix);
         const candidates = new Set<string>();
         if (relA !== null) candidates.add(relA);
         // Be defensive: if runtime doesn't include the prefix, try raw.
@@ -231,13 +243,12 @@ export function buildAzureFunctionsRouter(
             const params = matchCompiledRoute(compiled, rel);
             if (!params) continue;
 
-            const out = await compiled.fn.handler(req, {
+            return await compiled.fn.handler(req, {
               functionDir: compiled.fn.dir,
               routePrefix,
               rawPathname: pathname,
               params,
             });
-            return out;
           }
         }
 
@@ -256,8 +267,18 @@ export function buildAzureFunctionsRouter(
   };
 }
 
-export default buildAzureFunctionsRouter(await discoverFunctions(Deno.cwd()), {
-  routePrefix: Deno.env.get("AzureFunctionsJobHost__extensions__http__routePrefix") ??
-    Deno.env.get("FUNCTIONS_HTTP_ROUTE_PREFIX") ??
-    "api"
-});
+/**
+ * Async factory: discovers functions, then builds the router.
+ * IMPORTANT: no top-level await in this module (prevents discovery deadlocks during scanning).
+ */
+export async function createAzureFunctionsRouter(
+  options: CreateRouterOptions = {},
+): Promise<AzureFunctionsRouter> {
+  const rootDir = options.rootDir ?? Deno.cwd();
+  const routePrefix = options.routePrefix ?? resolveRoutePrefixFromEnv("api");
+  const functions = await discoverFunctions(rootDir);
+  return buildAzureFunctionsRouter(functions, {
+    routePrefix,
+    maxTriggerBodyBytes: options.maxTriggerBodyBytes,
+  });
+}

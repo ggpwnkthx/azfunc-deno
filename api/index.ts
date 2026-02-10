@@ -6,24 +6,27 @@ export const api = defineHttpFunction({
     bindings: [
       bindings.httpTrigger({
         name: "req",
-        route: "{*route}",
+        route: "{route}",
         authLevel: "anonymous",
       }),
       bindings.httpOut({ name: "res" }),
     ],
   },
   handler(request, ctx) {
+    console.debug(request)
     const routeRaw = ctx.params.route ?? "";
     const route = "/" + routeRaw.replace(/^\/+/, "");
 
     if (route === "/json") {
-      return Response.json({ hello: "world" });
+      return Response.json({ ReturnValue: { hello: "world" } });
     }
 
     return Response.json({
-      deno: { version: Deno.version.deno },
-      request: { url: request.url },
-      matched: { function: ctx.functionDir, routePrefix: ctx.routePrefix, route },
+      ReturnValue: {
+        deno: { version: Deno.version.deno },
+        request: { url: request.url },
+        matched: { function: ctx.functionDir, routePrefix: ctx.routePrefix, route },
+      }
     });
   },
 });

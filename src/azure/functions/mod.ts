@@ -1,8 +1,8 @@
+// Runtime surface area: safe to import from function modules.
+// IMPORTANT: do NOT export generator/scanner/router from here (prevents TLA cycles).
+
 export * from "./bindings.ts";
 export * from "./define.ts";
-export * from "./generator.ts";
-export * from "./router.ts";
-export * from "./scanner.ts";
 
 // Re-export utilities from lib/
 export type { AppErrorCode } from "./lib/errors.ts";

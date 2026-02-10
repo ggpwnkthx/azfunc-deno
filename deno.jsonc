@@ -10,7 +10,7 @@
     "gen": "deno run -A ./src/azure/functions/generator.ts",
     // Runs the custom handler server
     "serve": "deno run -A serve.ts",
-    "dev": "deno run -A --watch serve.ts"
+    "dev": "deno task gen && deno run -A --watch serve.ts"
   },
   "fmt": {
     "useTabs": false,
