@@ -217,7 +217,9 @@ export function buildAzureFunctionsRouter(
         const pathname = url.pathname;
 
         // Non-HTTP triggers (Queue/Blob/etc): Azure custom handler posts to /<FunctionName>
-        if (req.method === "POST" && pathname.startsWith("/") && pathname !== "/") {
+        if (
+          req.method === "POST" && pathname.startsWith("/") && pathname !== "/"
+        ) {
           const functionName = pathname.slice(1);
           const triggerFn = triggerMap.get(functionName);
           if (triggerFn) {

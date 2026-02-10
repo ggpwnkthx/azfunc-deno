@@ -13,7 +13,7 @@ export const api = defineHttpFunction({
     ],
   },
   handler(request, ctx) {
-    console.debug(request)
+    console.debug(request);
     const routeRaw = ctx.params.route ?? "";
     const route = "/" + routeRaw.replace(/^\/+/, "");
 
@@ -25,8 +25,12 @@ export const api = defineHttpFunction({
       ReturnValue: {
         deno: { version: Deno.version.deno },
         request: { url: request.url },
-        matched: { function: ctx.functionDir, routePrefix: ctx.routePrefix, route },
-      }
+        matched: {
+          function: ctx.functionDir,
+          routePrefix: ctx.routePrefix,
+          route,
+        },
+      },
     });
   },
 });

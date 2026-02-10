@@ -1,4 +1,4 @@
-import type { Binding, FunctionJson, HttpTriggerBinding } from "./bindings.ts";
+import type { Binding, FunctionJson, HttpTriggerBinding } from "./bindings/index.ts";
 import { AppError } from "./lib/errors.ts";
 import { assert } from "./lib/validate.ts";
 
@@ -38,12 +38,15 @@ export interface HttpFunctionDefinition extends FunctionDefinitionBase {
   httpTrigger: HttpTriggerBinding;
 }
 
-export interface TriggerFunctionDefinition<T = unknown> extends FunctionDefinitionBase {
+export interface TriggerFunctionDefinition<T = unknown>
+  extends FunctionDefinitionBase {
   kind: "trigger";
   handler: TriggerHandler<T>;
 }
 
-export type FunctionDefinition = HttpFunctionDefinition | TriggerFunctionDefinition;
+export type FunctionDefinition =
+  | HttpFunctionDefinition
+  | TriggerFunctionDefinition;
 
 function assertValidDir(dir: string): void {
   if (dir.trim() === "") {
@@ -66,7 +69,9 @@ function assertValidFunctionJson(functionJson: FunctionJson): void {
   }
 }
 
-function findHttpTrigger(bindings: readonly Binding[]): HttpTriggerBinding | null {
+function findHttpTrigger(
+  bindings: readonly Binding[],
+): HttpTriggerBinding | null {
   for (const b of bindings) {
     if (b.type === "httpTrigger") return b;
   }

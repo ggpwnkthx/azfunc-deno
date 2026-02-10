@@ -1,5 +1,5 @@
 import type { FunctionDefinition } from "./define.ts";
-import type { FunctionJson } from "./bindings.ts";
+import type { FunctionJson } from "./bindings/index.ts";
 import { joinPosix } from "./lib/path.ts";
 import { AppError } from "./lib/errors.ts";
 import { discoverFunctions } from "./scanner.ts";
@@ -69,6 +69,6 @@ export async function writeFunctionJsonFiles(
 }
 
 if (import.meta.main) {
-  const functions = await discoverFunctions(Deno.cwd())
-  await writeFunctionJsonFiles(functions, { rootDir: Deno.cwd() })
+  const functions = await discoverFunctions(Deno.cwd());
+  await writeFunctionJsonFiles(functions, { rootDir: Deno.cwd() });
 }

@@ -26,8 +26,7 @@ export const queueTrigger = defineTriggerFunction({
     // Normalize input: Azure Functions may JSON-encode queue items
     if (typeof queueItem === "string") {
       const trimmed = queueItem.trim();
-      const looksJson =
-        (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      const looksJson = (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
         (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
         (trimmed.startsWith("[") && trimmed.endsWith("]"));
 

@@ -5,7 +5,7 @@ const SKIP_DIRS = new Set([
   ".git",
   ".deno",
   "node_modules",
-  "src"
+  "src",
 ]);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -19,7 +19,9 @@ function isFunctionDefinition(v: unknown): v is FunctionDefinition {
   if (kind !== "http" && kind !== "trigger") return false;
   if (typeof v.dir !== "string") return false;
 
-  if (!isRecord(v.functionJson) || !Array.isArray(v.functionJson.bindings)) return false;
+  if (!isRecord(v.functionJson) || !Array.isArray(v.functionJson.bindings)) {
+    return false;
+  }
 
   // handler exists on both shapes (Http/Trigger) and should be callable
   if (typeof v.handler !== "function") return false;
@@ -49,7 +51,9 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-async function collectFromModule(modulePath: string): Promise<FunctionDefinition[]> {
+async function collectFromModule(
+  modulePath: string,
+): Promise<FunctionDefinition[]> {
   const defs: FunctionDefinition[] = [];
   const mod = await import(toFileUrl(modulePath));
 
@@ -64,7 +68,9 @@ async function collectFromModule(modulePath: string): Promise<FunctionDefinition
  * Scans for function directories by looking for directories containing `index.ts`.
  * This expects to scan *within* the functions root (e.g. `<repo>/src/functions`).
  */
-export async function scanFunctionDirs(functionsRootDir: string): Promise<string[]> {
+export async function scanFunctionDirs(
+  functionsRootDir: string,
+): Promise<string[]> {
   const root = functionsRootDir.replace(/\/+$/, "");
   const dirs: string[] = [];
 
@@ -96,7 +102,9 @@ export async function scanFunctionDirs(functionsRootDir: string): Promise<string
  * Prefers a manifest if present; otherwise auto-discovers by scanning for
  * `<functionsRoot>/**\/index.ts` and importing modules to find exported definitions.
  */
-export async function discoverFunctions(functionsRoot: string): Promise<FunctionDefinition[]> {
+export async function discoverFunctions(
+  functionsRoot: string,
+): Promise<FunctionDefinition[]> {
   const manifestPath = joinPosix(functionsRoot, "manifest.ts");
 
   // 1) Manifest (fast path)
