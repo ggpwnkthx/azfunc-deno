@@ -1,4 +1,11 @@
-import type { Binding, FunctionJson, HttpTriggerBinding } from "./bindings/index.ts";
+import type {
+  Binding,
+  FunctionJson,
+  HttpOutputBinding,
+  HttpTriggerBinding,
+} from "./bindings/index.ts";
+import { isHttpOutputBinding, isHttpTriggerBinding } from "./bindings/index.ts";
+import type { InvokeRequest, InvokeResponse } from "./invoke.ts";
 import { AppError } from "./lib/errors.ts";
 import { assert } from "./lib/validate.ts";
 
@@ -16,15 +23,25 @@ export interface TriggerContext {
   rawPathname: string;
 }
 
-export type HandlerResult = Response | Promise<Response>;
+export type HttpHandlerResult =
+  | Response
+  | InvokeResponse
+  | Promise<Response | InvokeResponse>;
+
+export type TriggerHandlerResult =
+  | InvokeResponse
+  | Promise<InvokeResponse>;
 
 export type HttpHandler =
-  | ((req: Request) => HandlerResult)
-  | ((req: Request, ctx: HttpContext) => HandlerResult);
+  | ((req: Request) => HttpHandlerResult)
+  | ((req: Request, ctx: HttpContext) => HttpHandlerResult);
 
-export type TriggerHandler<T = unknown> =
-  | ((payload: T) => HandlerResult)
-  | ((payload: T, ctx: TriggerContext) => HandlerResult);
+export type TriggerHandler<
+  TPayload extends InvokeRequest = InvokeRequest,
+  TResult extends InvokeResponse = InvokeResponse,
+> =
+  | ((payload: TPayload) => TResult | Promise<TResult>)
+  | ((payload: TPayload, ctx: TriggerContext) => TResult | Promise<TResult>);
 
 export interface FunctionDefinitionBase {
   dir: string;
@@ -36,12 +53,15 @@ export interface HttpFunctionDefinition extends FunctionDefinitionBase {
   kind: "http";
   handler: HttpHandler;
   httpTrigger: HttpTriggerBinding;
+  httpOutput: HttpOutputBinding | null;
 }
 
-export interface TriggerFunctionDefinition<T = unknown>
-  extends FunctionDefinitionBase {
+export interface TriggerFunctionDefinition<
+  TPayload extends InvokeRequest = InvokeRequest,
+  TResult extends InvokeResponse = InvokeResponse,
+> extends FunctionDefinitionBase {
   kind: "trigger";
-  handler: TriggerHandler<T>;
+  handler: TriggerHandler<TPayload, TResult>;
 }
 
 export type FunctionDefinition =
@@ -73,7 +93,16 @@ function findHttpTrigger(
   bindings: readonly Binding[],
 ): HttpTriggerBinding | null {
   for (const b of bindings) {
-    if (b.type === "httpTrigger") return b;
+    if (isHttpTriggerBinding(b)) return b;
+  }
+  return null;
+}
+
+function findHttpOutput(
+  bindings: readonly Binding[],
+): HttpOutputBinding | null {
+  for (const b of bindings) {
+    if (isHttpOutputBinding(b)) return b;
   }
   return null;
 }
@@ -96,20 +125,26 @@ export function defineHttpFunction(options: {
       ),
   );
 
+  const httpOutput = findHttpOutput(options.functionJson.bindings);
+
   return {
     dir: options.dir,
     functionJson: options.functionJson,
     kind: "http",
     handler: options.handler,
     httpTrigger: trigger,
+    httpOutput,
   };
 }
 
-export function defineTriggerFunction<T = unknown>(options: {
+export function defineTriggerFunction<
+  TPayload extends InvokeRequest = InvokeRequest,
+  TResult extends InvokeResponse = InvokeResponse,
+>(options: {
   dir: string;
   functionJson: FunctionJson;
-  handler: TriggerHandler<T>;
-}): TriggerFunctionDefinition<T> {
+  handler: TriggerHandler<TPayload, TResult>;
+}): TriggerFunctionDefinition<TPayload, TResult> {
   assertValidDir(options.dir);
   assertValidFunctionJson(options.functionJson);
 

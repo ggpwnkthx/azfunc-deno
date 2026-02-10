@@ -27,18 +27,22 @@ Azure Functions with Deno by implementing the custom handler protocol.
    defined using `defineHttpFunction()` or `defineTriggerFunction()` and
    exported from module files.
 
-2. **Discovery** (`src/azure/functions/scanner.ts`): Functions are discovered via:
-   - A `manifest.ts` file in the functions root (fast path - exports all definitions)
+2. **Discovery** (`src/azure/functions/scanner.ts`): Functions are discovered
+   via:
+   - A `manifest.ts` file in the functions root (fast path - exports all
+     definitions)
    - Auto-discovery: scans for `**/index.ts` files and imports to find exported
      definitions
 
 3. **Routing** (`src/azure/functions/router.ts`): The router handles requests:
    - HTTP triggers: routes based on `httpTrigger.route` (or function name if
-     omitted). Routes are sorted by specificity (more literals = higher priority).
+     omitted). Routes are sorted by specificity (more literals = higher
+     priority).
    - Non-HTTP triggers (queue, blob, etc.): receives POST requests at
      `/<FunctionName>`
-   - Route prefix defaults to `api`; configurable via `AzureFunctionsJobHost__extensions__http__routePrefix`
-     or `FUNCTIONS_HTTP_ROUTE_PREFIX` environment variables
+   - Route prefix defaults to `api`; configurable via
+     `AzureFunctionsJobHost__extensions__http__routePrefix` or
+     `FUNCTIONS_HTTP_ROUTE_PREFIX` environment variables
 
 4. **Generation** (`src/azure/functions/generator.ts`): Writes `function.json`
    files for each function (required by Azure Functions)
@@ -49,9 +53,10 @@ Azure Functions with Deno by implementing the custom handler protocol.
 ### Key Files
 
 - `src/azure/functions/mod.ts`: Safe public exports for function modules (no
-  router/scanner/generator to avoid TLA cycles). Exports `bindings`, `defineHttpFunction`,
-  `defineTriggerFunction`, plus utilities: `AppError`, `toErrorResponse`, `assert`,
-  `readJsonBodyLimited`, `tryParseJson`, `joinPosix`.
+  router/scanner/generator to avoid TLA cycles). Exports `bindings`,
+  `defineHttpFunction`, `defineTriggerFunction`, plus utilities: `AppError`,
+  `toErrorResponse`, `assert`, `readJsonBodyLimited`, `tryParseJson`,
+  `joinPosix`.
 - `src/azure/functions/bindings/index.ts`: Type definitions and builders for all
   binding types (HTTP, blob, queue, etc.)
 - `src/azure/functions/lib/`: Utility modules (errors, validation, JSON, path)
@@ -91,7 +96,8 @@ return Response.json({
 
 ### Custom bindings
 
-For Azure Functions extension bindings not modeled above, use `bindings.custom()`:
+For Azure Functions extension bindings not modeled above, use
+`bindings.custom()`:
 
 ```typescript
 bindings.custom({

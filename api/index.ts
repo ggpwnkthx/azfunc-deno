@@ -1,4 +1,8 @@
-import { bindings, defineHttpFunction } from "@azure/functions";
+import {
+  bindings,
+  defineHttpFunction,
+  type InvokeResponse,
+} from "@azure/functions";
 
 export const api = defineHttpFunction({
   dir: "api",
@@ -12,25 +16,32 @@ export const api = defineHttpFunction({
       bindings.httpOut({ name: "res" }),
     ],
   },
-  handler(request, ctx) {
-    console.debug(request);
+  handler(request, ctx): InvokeResponse {
     const routeRaw = ctx.params.route ?? "";
     const route = "/" + routeRaw.replace(/^\/+/, "");
 
-    if (route === "/json") {
-      return Response.json({ ReturnValue: { hello: "world" } });
-    }
+    const body = route === "/json" ? { hello: "world" } : {
+      deno: { version: Deno.version.deno },
+      request: { url: request.url, method: request.method },
+      matched: {
+        function: ctx.functionDir,
+        routePrefix: ctx.routePrefix,
+        rawPathname: ctx.rawPathname,
+        params: ctx.params,
+      },
+    };
 
-    return Response.json({
-      ReturnValue: {
-        deno: { version: Deno.version.deno },
-        request: { url: request.url },
-        matched: {
-          function: ctx.functionDir,
-          routePrefix: ctx.routePrefix,
-          route,
+    // Custom handler HTTP output binding: set Outputs.<httpOutBindingName>
+    return {
+      Outputs: {
+        res: {
+          statusCode: 200,
+          headers: {
+            "Content-Type": ["application/json; charset=utf-8"],
+          },
+          body: JSON.stringify(body),
         },
       },
-    });
+    };
   },
 });

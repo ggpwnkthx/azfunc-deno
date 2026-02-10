@@ -1,6 +1,27 @@
-import { bindings, defineTriggerFunction } from "@azure/functions";
+import {
+  bindings,
+  defineTriggerFunction,
+  type InvokeRequest,
+  type InvokeResponse,
+  type JsonValue,
+} from "@azure/functions";
 
-export const blobTrigger = defineTriggerFunction({
+type BlobTriggerData = {
+  myBlob: JsonValue;
+};
+
+type BlobTriggerMetadata = {
+  blobTrigger?: string;
+};
+
+type BlobTriggerResponse = InvokeResponse<{
+  outputBlob: JsonValue;
+}>;
+
+export const blobTrigger = defineTriggerFunction<
+  InvokeRequest<BlobTriggerData, BlobTriggerMetadata>,
+  BlobTriggerResponse
+>({
   dir: "blob_trigger",
   functionJson: {
     bindings: [
@@ -16,23 +37,19 @@ export const blobTrigger = defineTriggerFunction({
       }),
     ],
   },
-  handler(payload: unknown) {
-    const p = payload as {
-      Data?: { myBlob?: unknown };
-      Metadata?: { blobTrigger?: string };
+  handler(
+    payload: InvokeRequest<BlobTriggerData, BlobTriggerMetadata>,
+  ): BlobTriggerResponse {
+    const blobContent = payload.Data.myBlob;
+
+    const blobName = payload.Metadata.blobTrigger?.split("/").pop()?.trim() ||
+      "unknown";
+
+    return {
+      Outputs: {
+        outputBlob: blobContent,
+      },
+      Logs: [`Processed blob: ${blobName}`],
     };
-
-    const blobContent = p.Data?.myBlob;
-    const blobName = p.Metadata?.blobTrigger?.split("/").pop() ?? "unknown";
-
-    return new Response(
-      JSON.stringify({
-        Outputs: {
-          outputBlob: blobContent,
-        },
-        Logs: [`Processed blob: ${blobName}`],
-      }),
-      { headers: { "Content-Type": "application/json" } },
-    );
   },
 });

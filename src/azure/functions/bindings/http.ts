@@ -32,6 +32,12 @@ export function isHttpTriggerBinding(obj: unknown): obj is HttpTriggerBinding {
   return b.type === "httpTrigger" && b.direction === "in";
 }
 
+export function isHttpOutputBinding(obj: unknown): obj is HttpOutputBinding {
+  if (!isRecord(obj)) return false;
+  const b = obj as Record<string, unknown>;
+  return b.type === "http" && b.direction === "out";
+}
+
 /* ------------------------------- Builders -------------------------------- */
 
 export const httpBindings = {

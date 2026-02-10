@@ -17,11 +17,8 @@ export type {
   KnownBindingType,
 } from "./types.ts";
 
-export type {
-  HttpOutputBinding,
-  HttpTriggerBinding,
-  isHttpTriggerBinding,
-} from "./http.ts";
+export type { HttpOutputBinding, HttpTriggerBinding } from "./http.ts";
+export { isHttpOutputBinding, isHttpTriggerBinding } from "./http.ts";
 
 export type {
   BlobInputBinding,
