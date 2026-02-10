@@ -1,8 +1,10 @@
 import type {
   FunctionDefinition,
-  HttpFunctionDefinition,
+  HttpHandler,
   TriggerFunctionDefinition,
+  TriggerHandler,
 } from "./define.ts";
+import { isHttpTriggerBinding } from "./bindings/index.ts";
 import {
   asAzureHttpRequestData,
   type InvokeResponse,
@@ -60,12 +62,13 @@ export function resolveRoutePrefixFromEnv(fallback = "api"): string {
 }
 
 async function coerceHttpHandlerResult(
-  fn: HttpFunctionDefinition,
+  fn: TriggerFunctionDefinition,
   out: Response | InvokeResponse,
   maxBodyBytes: number,
 ): Promise<InvokeResponse> {
   if (out instanceof Response) {
-    const httpOutName = fn.httpOutput?.name ?? "res";
+    const httpOut = fn.getBindingByType("http");
+    const httpOutName = httpOut?.name ?? "res";
     return await invokeResponseFromHttpResponse(httpOutName, out, {
       maxBodyBytes,
     });
@@ -119,17 +122,22 @@ export function buildAzureFunctionsRouter(
         const raw = await readJsonBodyLimited(req, maxInvokeBodyBytes);
         const invokeReq = parseInvokeRequest(raw);
 
-        if (fn.kind === "trigger") {
+        const httpTrigger = fn.getTriggerBinding(isHttpTriggerBinding);
+        if (!httpTrigger) {
           const triggerFn = fn as TriggerFunctionDefinition;
-          const out = await triggerFn.handler(invokeReq as never, {
+          const ctx = {
             functionDir: triggerFn.dir,
             rawPathname: url.pathname,
-          });
+          };
+          const out = await (triggerFn.handler as TriggerHandler)(
+            invokeReq as never,
+            ctx,
+          );
           return Response.json(out);
         }
 
-        const httpFn = fn as HttpFunctionDefinition;
-        const triggerName = httpFn.httpTrigger.name;
+        const httpFn = fn as TriggerFunctionDefinition;
+        const triggerName = httpTrigger.name;
         const httpReqData = asAzureHttpRequestData(invokeReq.Data[triggerName]);
 
         const denoReq = toDenoRequest(httpReqData);
@@ -142,7 +150,7 @@ export function buildAzureFunctionsRouter(
           params: httpReqData.Params ?? {},
         };
 
-        const out = await httpFn.handler(
+        const out = await (httpFn.handler as HttpHandler)(
           denoReq,
           ctx,
         );

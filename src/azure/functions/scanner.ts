@@ -16,20 +16,15 @@ function isFunctionDefinition(v: unknown): v is FunctionDefinition {
   if (!isRecord(v)) return false;
 
   const kind = v.kind;
-  if (kind !== "http" && kind !== "trigger") return false;
+  if (kind !== "trigger") return false;
   if (typeof v.dir !== "string") return false;
 
   if (!isRecord(v.functionJson) || !Array.isArray(v.functionJson.bindings)) {
     return false;
   }
 
-  // handler exists on both shapes (Http/Trigger) and should be callable
+  // handler exists and should be callable
   if (typeof v.handler !== "function") return false;
-
-  if (kind === "http") {
-    return isRecord((v as Record<string, unknown>).httpTrigger) &&
-      (v as Record<string, unknown>).httpTrigger !== null;
-  }
 
   return true;
 }

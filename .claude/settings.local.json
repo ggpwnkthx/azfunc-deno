@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(func:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(deno run:*)",
+      "Bash(/tmp/test_full.ts:*)",
+      "Bash(deno check:*)",
+      "Bash(deno lint:*)",
+      "Bash(ls:*)",
+      "Bash(timeout 10 deno eval:*)",
+      "Bash(timeout 5 deno eval:*)"
+    ]
+  }
+}

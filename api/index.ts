@@ -1,10 +1,11 @@
 import {
   bindings,
-  defineHttpFunction,
+  defineTriggerFunction,
+  type HttpContext,
   type InvokeResponse,
 } from "@azure/functions";
 
-export const api = defineHttpFunction({
+export const api = defineTriggerFunction({
   dir: "api",
   functionJson: {
     bindings: [
@@ -16,7 +17,7 @@ export const api = defineHttpFunction({
       bindings.httpOut({ name: "res" }),
     ],
   },
-  handler(request, ctx): InvokeResponse {
+  handler(request: Request, ctx: HttpContext): InvokeResponse {
     const routeRaw = ctx.params.route ?? "";
     const route = "/" + routeRaw.replace(/^\/+/, "");
 

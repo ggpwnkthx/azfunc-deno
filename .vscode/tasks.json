@@ -4,7 +4,7 @@
     {
       "type": "shell",
       "label": "start azfunc",
-      "command": "func host start --verbose",
+      "command": "func host start",
       "isBackground": true,
       "problemMatcher": {
         "base": "$deno",
