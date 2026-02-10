@@ -1,8 +1,8 @@
 import type { FunctionDefinition } from "./define.ts";
 import type { FunctionJson } from "./bindings/index.ts";
-import { joinPosix } from "./lib/path.ts";
 import { AppError } from "./lib/errors.ts";
 import { discoverFunctions } from "./scanner.ts";
+import { joinFsPath } from "./lib/path.ts";
 
 export interface GenerateOptions {
   /** Repo root where function folders live (default: Deno.cwd()) */
@@ -25,6 +25,13 @@ export interface WrittenFile {
   functionJson: FunctionJson;
 }
 
+async function atomicWriteTextFile(path: string, text: string): Promise<void> {
+  const dir = path.split(/[/\\]/).slice(0, -1).join("/") || ".";
+  const tmp = await Deno.makeTempFile({ dir, prefix: ".functionjson." });
+  await Deno.writeTextFile(tmp, text);
+  await Deno.rename(tmp, path);
+}
+
 export async function writeFunctionJsonFiles(
   functions: readonly FunctionDefinition[],
   options: GenerateOptions = {},
@@ -44,7 +51,7 @@ export async function writeFunctionJsonFiles(
   const written: WrittenFile[] = [];
 
   for (const fn of functions) {
-    const functionDirPath = joinPosix(rootDir, fn.dir);
+    const functionDirPath = joinFsPath(rootDir, fn.dir);
 
     if (ensureDirs) {
       await Deno.mkdir(functionDirPath, { recursive: true });
@@ -58,9 +65,9 @@ export async function writeFunctionJsonFiles(
       }
     }
 
-    const outPath = joinPosix(functionDirPath, "function.json");
+    const outPath = joinFsPath(functionDirPath, "function.json");
     const jsonText = JSON.stringify(fn.functionJson, null, 2) + "\n";
-    await Deno.writeTextFile(outPath, jsonText);
+    await atomicWriteTextFile(outPath, jsonText);
 
     written.push({ dir: fn.dir, path: outPath, functionJson: fn.functionJson });
   }

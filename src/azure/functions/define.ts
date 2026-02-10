@@ -1,6 +1,8 @@
 import type { Binding, FunctionJson } from "./bindings/index.ts";
+import { isHttpOutputBinding, isHttpTriggerBinding } from "./bindings/index.ts";
 import type { InvokeRequest, InvokeResponse } from "./invoke.ts";
 import { AppError } from "./lib/errors.ts";
+import { normalizeFunctionDir } from "./lib/path.ts";
 
 export type FunctionKind = "http" | "trigger";
 
@@ -36,27 +38,36 @@ export type TriggerHandler<
   | ((payload: TPayload) => TResult | Promise<TResult>)
   | ((payload: TPayload, ctx: TriggerContext) => TResult | Promise<TResult>);
 
-export interface FunctionDefinitionBase {
+export interface FunctionBindingsIndex {
+  all: readonly Binding[];
+  /** The inferred trigger binding */
+  trigger?: Binding;
+  inputs: readonly Binding[];
+  outputs: readonly Binding[];
+  byName: ReadonlyMap<string, Binding>;
+  byType: ReadonlyMap<string, readonly Binding[]>;
+}
+
+export type BindingLookupMethods = {
+  getBindingByName(name: string): Binding | undefined;
+  getBindingByType(type: string): Binding | undefined;
+  getBindingsByType(type: string): readonly Binding[];
+};
+
+export type FunctionDefinitionBase = {
   dir: string;
   functionJson: FunctionJson;
   kind: FunctionKind;
-}
+  bindings: FunctionBindingsIndex;
+} & BindingLookupMethods;
 
-/**
- * Generic binding storage for TriggerFunctionDefinition.
- * Provides structured access to bindings by direction, name, and type.
- */
-export interface TriggerFunctionBindings {
-  /** The trigger binding (first "in" direction binding) */
-  trigger?: Binding;
-  /** All input bindings (direction "in") */
-  inputs: Binding[];
-  /** All output bindings (direction "out") */
-  outputs: Binding[];
-  /** Lookup by binding name */
-  byName: Record<string, Binding>;
-  /** Lookup by binding type */
-  byType: Record<string, Binding | undefined>;
+export interface HttpFunctionDefinition extends FunctionDefinitionBase {
+  kind: "http";
+  handler: HttpHandler;
+  http: {
+    triggerName: string;
+    outName: string;
+  };
 }
 
 export interface TriggerFunctionDefinition<
@@ -64,41 +75,12 @@ export interface TriggerFunctionDefinition<
   TResult extends InvokeResponse = InvokeResponse,
 > extends FunctionDefinitionBase {
   kind: "trigger";
-  handler: TriggerHandler<TPayload, TResult> | HttpHandler;
-  /** Generic binding storage */
-  bindings: TriggerFunctionBindings;
-
-  /** Get the trigger binding filtered by a type guard */
-  getTriggerBinding<T extends Binding>(
-    guard: (b: Binding) => b is T,
-  ): T | undefined;
-  /** Lookup a binding by its name */
-  getBindingByName(name: string): Binding | undefined;
-  /** Lookup a binding by its type (e.g., "httpTrigger", "queue") */
-  getBindingByType(type: string): Binding | undefined;
-  /** Get all input bindings filtered by a type guard */
-  getInputBindings<T extends Binding>(
-    guard: (b: Binding) => b is T,
-  ): T[];
-  /** Get all output bindings filtered by a type guard */
-  getOutputBindings<T extends Binding>(
-    guard: (b: Binding) => b is T,
-  ): T[];
+  handler: TriggerHandler<TPayload, TResult>;
 }
 
-export type FunctionDefinition = TriggerFunctionDefinition;
-
-function assertValidDir(dir: string): void {
-  if (dir.trim() === "") {
-    throw new AppError("DEFINITION", "Function dir must be non-empty.");
-  }
-  if (dir.includes("\\") || dir.startsWith("/") || dir.includes("..")) {
-    throw new AppError(
-      "DEFINITION",
-      `Function dir must be a relative posix-like path without ".." or leading "/": ${dir}`,
-    );
-  }
-}
+export type FunctionDefinition =
+  | HttpFunctionDefinition
+  | TriggerFunctionDefinition;
 
 function assertValidFunctionJson(functionJson: FunctionJson): void {
   if (!functionJson || !Array.isArray(functionJson.bindings)) {
@@ -109,100 +91,158 @@ function assertValidFunctionJson(functionJson: FunctionJson): void {
   }
 }
 
-/** Find the first binding matching a type guard */
-export function findBinding<T extends Binding>(
-  bindings: readonly Binding[],
-  typeGuard: (b: Binding) => b is T,
-): T | null {
-  for (const b of bindings) {
-    if (typeGuard(b)) return b;
-  }
-  return null;
+function isLikelyTriggerBinding(b: Binding): boolean {
+  // Abstract trigger inference: do NOT hardcode trigger types.
+  // Most triggers end with "Trigger". If none match, we fall back to first "in" binding.
+  return b.direction === "in" && /trigger$/i.test(b.type);
 }
 
-/** Find all bindings matching a type guard */
-export function findBindings<T extends Binding>(
-  bindings: readonly Binding[],
-  typeGuard: (b: Binding) => b is T,
-): T[] {
-  const result: T[] = [];
-  for (const b of bindings) {
-    if (typeGuard(b)) result.push(b);
+function indexBindings(all: readonly Binding[]): FunctionBindingsIndex {
+  const inputs = all.filter((b) => b.direction === "in");
+  const outputs = all.filter((b) => b.direction === "out");
+
+  const triggerCandidates = all.filter(isLikelyTriggerBinding);
+  const trigger = triggerCandidates[0] ?? inputs[0];
+
+  // Validate: binding names should be unique
+  const byName = new Map<string, Binding>();
+  for (const b of all) {
+    if (byName.has(b.name)) {
+      throw new AppError("DEFINITION", `Duplicate binding name "${b.name}".`);
+    }
+    byName.set(b.name, b);
   }
-  return result;
+
+  // Group by type
+  const byType = new Map<string, Binding[]>();
+  for (const b of all) {
+    const arr = byType.get(b.type);
+    if (arr) arr.push(b);
+    else byType.set(b.type, [b]);
+  }
+
+  // If we detect multiple "*Trigger" bindings, that’s almost certainly invalid.
+  // (Still does not enumerate trigger types.)
+  if (triggerCandidates.length > 1) {
+    throw new AppError(
+      "DEFINITION",
+      `function.json must define exactly 1 trigger binding; found ${triggerCandidates.length}.`,
+      { details: { triggerTypes: triggerCandidates.map((b) => b.type) } },
+    );
+  }
+  if (!trigger) {
+    throw new AppError("DEFINITION", "Unable to infer trigger binding.");
+  }
+
+  return { all, trigger, inputs, outputs, byName, byType };
 }
 
-/** Get the trigger binding (first "in" direction binding) */
-export function getTriggerBinding(
-  bindings: readonly Binding[],
-): Binding | null {
-  for (const b of bindings) {
-    if (b.direction === "in") return b;
-  }
-  return null;
+/**
+ * Avoids TS widening that caused TS2739: we return an intersection type, not a base type.
+ */
+function withBindingLookups<T extends { bindings: FunctionBindingsIndex }>(
+  def: T,
+): T & BindingLookupMethods {
+  const methods: BindingLookupMethods = {
+    getBindingByName(name: string): Binding | undefined {
+      return def.bindings.byName.get(name);
+    },
+    getBindingByType(type: string): Binding | undefined {
+      return def.bindings.byType.get(type)?.[0];
+    },
+    getBindingsByType(type: string): readonly Binding[] {
+      return def.bindings.byType.get(type) ?? [];
+    },
+  };
+
+  return Object.assign(def, methods);
 }
 
+/**
+ * HTTP is special (custom handler envelope + http output binding encoding),
+ * so we keep an explicit constructor for it.
+ */
+export function defineHttpFunction(options: {
+  dir: string;
+  functionJson: FunctionJson;
+  handler: HttpHandler;
+}): HttpFunctionDefinition {
+  const dir = normalizeFunctionDir(options.dir);
+  assertValidFunctionJson(options.functionJson);
+
+  const bindings = indexBindings(options.functionJson.bindings);
+
+  const httpTriggers = bindings.all.filter(isHttpTriggerBinding);
+  if (httpTriggers.length !== 1) {
+    throw new AppError(
+      "DEFINITION",
+      `HTTP function "${dir}" must define exactly one "httpTrigger"; found ${httpTriggers.length}.`,
+    );
+  }
+
+  const httpOuts = bindings.all.filter(isHttpOutputBinding);
+  if (httpOuts.length !== 1) {
+    throw new AppError(
+      "DEFINITION",
+      `HTTP function "${dir}" must define exactly one "http" output binding; found ${httpOuts.length}.`,
+    );
+  }
+
+  const httpTrigger = httpTriggers[0];
+  const httpOut = httpOuts[0];
+
+  const def: HttpFunctionDefinition = withBindingLookups({
+    dir,
+    functionJson: options.functionJson,
+    kind: "http",
+    handler: options.handler,
+    bindings,
+    http: {
+      triggerName: httpTrigger.name,
+      outName: httpOut.name,
+    },
+  });
+
+  return def;
+}
+
+/**
+ * Generic trigger constructor (abstract over trigger types).
+ * This is the one you want for non-HTTP triggers.
+ */
 export function defineTriggerFunction<
   TPayload extends InvokeRequest = InvokeRequest,
   TResult extends InvokeResponse = InvokeResponse,
 >(options: {
   dir: string;
   functionJson: FunctionJson;
-  handler: TriggerHandler<TPayload, TResult> | HttpHandler;
+  handler: TriggerHandler<TPayload, TResult>;
 }): TriggerFunctionDefinition<TPayload, TResult> {
-  assertValidDir(options.dir);
+  const dir = normalizeFunctionDir(options.dir);
   assertValidFunctionJson(options.functionJson);
 
-  const allBindings = options.functionJson.bindings;
-  const trigger = getTriggerBinding(allBindings) ?? undefined;
-  const inputs = allBindings.filter((b) => b.direction === "in");
-  const outputs = allBindings.filter((b) => b.direction === "out");
-  const byName: Record<string, Binding> = {};
-  const byType: Record<string, Binding | undefined> = {};
+  const bindings = indexBindings(options.functionJson.bindings);
 
-  for (const b of allBindings) {
-    byName[b.name] = b;
-    byType[b.type] = b;
+  if (bindings.all.some(isHttpTriggerBinding)) {
+    throw new AppError(
+      "DEFINITION",
+      `Trigger function "${dir}" contains an "httpTrigger"; use defineHttpFunction().`,
+    );
   }
 
-  const bindings: TriggerFunctionBindings = {
-    trigger,
-    inputs,
-    outputs,
-    byName,
-    byType,
-  };
-
-  const definition: TriggerFunctionDefinition<TPayload, TResult> = {
-    dir: options.dir,
+  const def: TriggerFunctionDefinition<TPayload, TResult> = withBindingLookups({
+    dir,
     functionJson: options.functionJson,
     kind: "trigger",
-    handler: options.handler as TriggerHandler<TPayload, TResult>,
+    handler: options.handler,
     bindings,
-    getTriggerBinding<T extends Binding>(
-      guard: (b: Binding) => b is T,
-    ): T | undefined {
-      const trigger = bindings.trigger;
-      if (trigger && guard(trigger)) return trigger as T;
-      return undefined;
-    },
-    getBindingByName(name: string): Binding | undefined {
-      return bindings.byName[name];
-    },
-    getBindingByType(type: string): Binding | undefined {
-      return bindings.byType[type];
-    },
-    getInputBindings<T extends Binding>(
-      guard: (b: Binding) => b is T,
-    ): T[] {
-      return bindings.inputs.filter((b) => guard(b)) as T[];
-    },
-    getOutputBindings<T extends Binding>(
-      guard: (b: Binding) => b is T,
-    ): T[] {
-      return bindings.outputs.filter((b) => guard(b)) as T[];
-    },
-  };
+  });
 
-  return definition;
+  return def;
 }
+
+/**
+ * Convenience alias: "defineFunction" == "defineTriggerFunction"
+ * (keeps things abstract without mixing incompatible handler types).
+ */
+export const defineFunction = defineTriggerFunction;

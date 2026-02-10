@@ -1,4 +1,5 @@
 import { AppError } from "./lib/errors.ts";
+import { readStreamTextLimited } from "./lib/streams.ts";
 
 /**
  * JSON types (compatible with custom handler payloads).
@@ -10,7 +11,6 @@ export type JsonObject = { [k: string]: JsonValue };
 
 /**
  * Azure Functions Custom Handler request payload.
- * Docs: Data + Metadata. (Values are JSON-decoded.)
  */
 export interface InvokeRequest<
   TData extends Record<string, JsonValue> = Record<string, JsonValue>,
@@ -22,7 +22,6 @@ export interface InvokeRequest<
 
 /**
  * Azure Functions Custom Handler response payload.
- * Docs: Outputs + Logs + ReturnValue.
  */
 export interface InvokeResponse<
   TOutputs extends Record<string, JsonValue> = Record<string, JsonValue>,
@@ -35,7 +34,7 @@ export interface InvokeResponse<
 
 /**
  * HTTP trigger data shape inside InvokeRequest.Data.<httpTriggerName>.
- * (Matches the casing used by the Functions host.)
+ * (Matches casing used by the Functions host.)
  */
 export interface AzureHttpRequestData {
   Url: string;
@@ -48,10 +47,15 @@ export interface AzureHttpRequestData {
 
 /**
  * HTTP output binding value for Outputs.<httpOutName>.
+ *
+ * IMPORTANT:
+ * - Request headers are represented as string[] in the custom handler payload.
+ * - Response headers MUST be emitted as string values. If you emit arrays,
+ *   some host paths stringify them (often including newlines), which Kestrel rejects.
  */
 export interface AzureHttpResponseData {
   statusCode?: number;
-  headers?: Record<string, readonly string[]>;
+  headers?: Record<string, string>;
   body?: string;
 }
 
@@ -72,10 +76,7 @@ function isStringArray(v: unknown): v is string[] {
 
 function asStringArray(v: unknown, what: string): string[] {
   if (!isStringArray(v)) {
-    throw new AppError(
-      "BAD_REQUEST",
-      `Invalid ${what}: expected string[].`,
-    );
+    throw new AppError("BAD_REQUEST", `Invalid ${what}: expected string[].`);
   }
   return v;
 }
@@ -107,10 +108,6 @@ function asHeaderRecord(
   return out;
 }
 
-/**
- * Parse + validate the top-level InvokeRequest envelope.
- * (Does not deep-validate Data values beyond “is object”.)
- */
 export function parseInvokeRequest(
   payload: unknown,
 ): InvokeRequest<Record<string, JsonValue>, Record<string, JsonValue>> {
@@ -127,9 +124,6 @@ export function parseInvokeRequest(
   };
 }
 
-/**
- * Validate/normalize Data.<bindingName> into AzureHttpRequestData.
- */
 export function asAzureHttpRequestData(v: unknown): AzureHttpRequestData {
   const r = asRecord(v, "Data.<httpTrigger>");
   const url = r["Url"];
@@ -176,70 +170,55 @@ export function toDenoRequest(req: AzureHttpRequestData): Request {
   const init: RequestInit = {
     method: req.Method,
     headers,
+    ...(req.Body !== undefined ? { body: req.Body } : {}),
   };
-
-  if (req.Body !== undefined) {
-    init.body = req.Body;
-  }
 
   return new Request(req.Url, init);
 }
 
-function concatChunks(chunks: Uint8Array[], total: number): Uint8Array {
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const c of chunks) {
-    out.set(c, offset);
-    offset += c.byteLength;
+/**
+ * Kestrel rejects control chars (incl. \r/\n) and non-ASCII in header values.
+ * Fail fast so we don’t crash the host.
+ */
+const HEADER_NAME_TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+function assertSafeHeaderName(name: string): void {
+  if (!HEADER_NAME_TOKEN_RE.test(name)) {
+    throw new AppError("INTERNAL", `Unsafe HTTP response header name: ${name}`);
   }
-  return out;
 }
 
-async function readStreamTextLimited(
-  body: ReadableStream<Uint8Array>,
-  maxBytes: number,
-): Promise<string> {
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
+function assertSafeHeaderValueAscii(value: string, name: string): void {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
 
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-
-      total += value.byteLength;
-      if (total > maxBytes) {
-        throw new AppError(
-          "BAD_REQUEST",
-          `HTTP response body too large (>${maxBytes} bytes).`,
-          { details: { maxBytes } },
-        );
-      }
-      chunks.push(value);
+    // Disallow CTLs (0x00-0x1F), DEL (0x7F), and non-ASCII (> 0x7F).
+    if (code < 0x20 || code === 0x7f || code > 0x7f) {
+      throw new AppError(
+        "INTERNAL",
+        `Unsafe HTTP response header value for "${name}" (char 0x${
+          code.toString(16).padStart(4, "0")
+        }).`,
+      );
     }
-  } finally {
-    reader.releaseLock();
   }
-
-  return new TextDecoder().decode(concatChunks(chunks, total));
 }
 
-function headersToAzure(
-  h: Headers,
-): Record<string, readonly string[]> {
-  const out: Record<string, readonly string[]> = {};
+function headersToAzure(h: Headers): Record<string, string> {
+  const out: Record<string, string> = {};
 
-  // Most headers are single-valued once exposed via Headers.
+  // Note: Headers() in Fetch flattens multi-values (except Set-Cookie, which is special).
   for (const [k, v] of h.entries()) {
-    if (k.toLowerCase() === "set-cookie") continue;
-    out[k] = [v];
-  }
+    const lk = k.toLowerCase();
 
-  // Preserve multiple Set-Cookie values when available (Deno extension).
-  const sc = h.getSetCookie?.() ?? [];
-  if (sc.length > 0) out["set-cookie"] = sc;
+    // Set-Cookie handling in custom handlers is awkward because the response shape is a map.
+    // Keep prior behavior: skip it rather than emitting something invalid.
+    if (lk === "set-cookie") continue;
+
+    assertSafeHeaderName(k);
+    assertSafeHeaderValueAscii(v, k);
+    out[k] = v;
+  }
 
   return out;
 }
@@ -255,12 +234,14 @@ export async function toAzureHttpResponseData(
   const maxBodyBytes = opts.maxBodyBytes ?? 4 * 1024 * 1024;
 
   const bodyText = res.body
-    ? await readStreamTextLimited(res.body, maxBodyBytes)
+    ? await readStreamTextLimited(res.body, maxBodyBytes, "HTTP response body")
     : undefined;
+
+  const headers = headersToAzure(res.headers);
 
   return {
     statusCode: res.status,
-    headers: headersToAzure(res.headers),
+    ...(Object.keys(headers).length > 0 ? { headers } : {}),
     ...(bodyText !== undefined ? { body: bodyText } : {}),
   };
 }

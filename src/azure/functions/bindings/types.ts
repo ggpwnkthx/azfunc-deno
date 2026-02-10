@@ -8,13 +8,6 @@
 export type Direction = "in" | "out" | "inout";
 export type DataTypeHint = "string" | "binary" | "stream";
 
-/**
- * Binding types explicitly listed by the Azure Functions host docs (examples)
- * plus the SchemaStore function.json schema (which the docs link to).
- *
- * Note: Azure Functions supports additional binding types via extensions; those
- * can be represented using `CustomBinding`.
- */
 export const KNOWN_BINDING_TYPES = [
   // HTTP
   "httpTrigger",
@@ -68,12 +61,7 @@ export interface BindingBase {
   dataType?: DataTypeHint;
 }
 
-/**
- * Fallback for binding extensions or any binding types not in KNOWN_BINDING_TYPES.
- * Keeps the runtime flexible while still letting us type the common bindings.
- */
 export interface CustomBinding extends BindingBase {
-  // Azure binding-specific properties are free-form.
   [key: string]: unknown;
 }
 

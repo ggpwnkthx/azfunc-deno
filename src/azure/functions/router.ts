@@ -1,10 +1,10 @@
 import type {
   FunctionDefinition,
+  HttpFunctionDefinition,
   HttpHandler,
   TriggerFunctionDefinition,
   TriggerHandler,
 } from "./define.ts";
-import { isHttpTriggerBinding } from "./bindings/index.ts";
 import {
   asAzureHttpRequestData,
   type InvokeResponse,
@@ -12,32 +12,17 @@ import {
   parseInvokeRequest,
   toDenoRequest,
 } from "./invoke.ts";
-import { toErrorResponse } from "./lib/errors.ts";
 import { readJsonBodyLimited } from "./lib/json.ts";
+import { toErrorPayload } from "./lib/errors.ts";
 import { discoverFunctions } from "./scanner.ts";
 
 interface RouterOptions {
-  /**
-   * Azure Functions HTTP route prefix (host.json extensions.http.routePrefix).
-   * Default: "api"
-   *
-   * Note: In non-proxying custom handler mode, routing to the handler is
-   * performed by function name (folder name), but this is still useful context.
-   */
   routePrefix?: string;
-
-  /** Max bytes to buffer when parsing invocation JSON payloads. Default: 1 MiB */
   maxInvokeBodyBytes?: number;
-
-  /**
-   * Max bytes to buffer when converting a returned `Response` into
-   * Outputs.<httpOut>.body. Default: 4 MiB.
-   */
   maxHttpResponseBodyBytes?: number;
 }
 
 export interface CreateRouterOptions extends RouterOptions {
-  /** Where function folders live (default: Deno.cwd()) */
   rootDir?: string;
 }
 
@@ -55,25 +40,46 @@ function extractFunctionName(pathname: string): string {
 }
 
 export function resolveRoutePrefixFromEnv(fallback = "api"): string {
-  // Azure uses double-underscore for nested config keys.
   return Deno.env.get("AzureFunctionsJobHost__extensions__http__routePrefix") ??
     Deno.env.get("FUNCTIONS_HTTP_ROUTE_PREFIX") ??
     fallback;
 }
 
 async function coerceHttpHandlerResult(
-  fn: TriggerFunctionDefinition,
+  fn: HttpFunctionDefinition,
   out: Response | InvokeResponse,
   maxBodyBytes: number,
 ): Promise<InvokeResponse> {
   if (out instanceof Response) {
-    const httpOut = fn.getBindingByType("http");
-    const httpOutName = httpOut?.name ?? "res";
-    return await invokeResponseFromHttpResponse(httpOutName, out, {
+    return await invokeResponseFromHttpResponse(fn.http.outName, out, {
       maxBodyBytes,
     });
   }
   return out;
+}
+
+/**
+ * Non-proxying custom handler behavior:
+ * For HTTP-trigger functions, always return 200 to the host with an InvokeResponse,
+ * encoding the caller-visible error into the http output binding.
+ */
+async function httpInvokeErrorResponse(
+  fn: HttpFunctionDefinition,
+  err: unknown,
+  maxBodyBytes: number,
+): Promise<Response> {
+  const p = toErrorPayload(err);
+  const callerRes = Response.json(p.body, { status: p.status });
+
+  const invokeRes = await invokeResponseFromHttpResponse(
+    fn.http.outName,
+    callerRes,
+    {
+      maxBodyBytes,
+    },
+  );
+
+  return Response.json(invokeRes, { status: 200 });
 }
 
 export function buildAzureFunctionsRouter(
@@ -90,56 +96,53 @@ export function buildAzureFunctionsRouter(
 
   return {
     async handle(req: Request): Promise<Response> {
+      const url = new URL(req.url);
+      const fnName = extractFunctionName(url.pathname);
+
+      if (req.method !== "POST") {
+        return Response.json(
+          {
+            error: "MethodNotAllowed",
+            message:
+              "Custom handler endpoints are invoked by the Functions host using POST.",
+            request: { method: req.method, pathname: url.pathname },
+          },
+          { status: 405 },
+        );
+      }
+
+      const fn = map.get(fnName);
+      if (!fn) {
+        return Response.json(
+          {
+            error: "NotFound",
+            message: "No function matched this invocation path.",
+            request: { pathname: url.pathname },
+            knownFunctions: [...map.keys()].sort(),
+          },
+          { status: 404 },
+        );
+      }
+
       try {
-        const url = new URL(req.url);
-        const fnName = extractFunctionName(url.pathname);
-
-        if (req.method !== "POST") {
-          return Response.json(
-            {
-              error: "MethodNotAllowed",
-              message:
-                "Custom handler endpoints are invoked by the Functions host using POST.",
-              request: { method: req.method, pathname: url.pathname },
-            },
-            { status: 405 },
-          );
-        }
-
-        const fn = map.get(fnName);
-        if (!fn) {
-          return Response.json(
-            {
-              error: "NotFound",
-              message: "No function matched this invocation path.",
-              request: { pathname: url.pathname },
-              knownFunctions: [...map.keys()].sort(),
-            },
-            { status: 404 },
-          );
-        }
-
         const raw = await readJsonBodyLimited(req, maxInvokeBodyBytes);
         const invokeReq = parseInvokeRequest(raw);
 
-        const httpTrigger = fn.getTriggerBinding(isHttpTriggerBinding);
-        if (!httpTrigger) {
+        if (fn.kind === "trigger") {
           const triggerFn = fn as TriggerFunctionDefinition;
-          const ctx = {
-            functionDir: triggerFn.dir,
-            rawPathname: url.pathname,
-          };
+          const ctx = { functionDir: triggerFn.dir, rawPathname: url.pathname };
           const out = await (triggerFn.handler as TriggerHandler)(
             invokeReq as never,
             ctx,
           );
-          return Response.json(out);
+          return Response.json(out, { status: 200 });
         }
 
-        const httpFn = fn as TriggerFunctionDefinition;
-        const triggerName = httpTrigger.name;
-        const httpReqData = asAzureHttpRequestData(invokeReq.Data[triggerName]);
+        const httpFn = fn as HttpFunctionDefinition;
 
+        const httpReqData = asAzureHttpRequestData(
+          invokeReq.Data[httpFn.http.triggerName],
+        );
         const denoReq = toDenoRequest(httpReqData);
         const rawPathname = new URL(httpReqData.Url).pathname;
 
@@ -150,10 +153,7 @@ export function buildAzureFunctionsRouter(
           params: httpReqData.Params ?? {},
         };
 
-        const out = await (httpFn.handler as HttpHandler)(
-          denoReq,
-          ctx,
-        );
+        const out = await (httpFn.handler as HttpHandler)(denoReq, ctx);
 
         const invokeRes = await coerceHttpHandlerResult(
           httpFn,
@@ -161,24 +161,33 @@ export function buildAzureFunctionsRouter(
           maxHttpResponseBodyBytes,
         );
 
-        return Response.json(invokeRes);
+        return Response.json(invokeRes, { status: 200 });
       } catch (err) {
-        return toErrorResponse(err);
+        if (fn.kind === "http") {
+          return await httpInvokeErrorResponse(
+            fn as HttpFunctionDefinition,
+            err,
+            maxHttpResponseBodyBytes,
+          );
+        }
+
+        // Non-HTTP triggers: fail the invocation (host can retry / record failure)
+        const p = toErrorPayload(err);
+        return Response.json(p.body, {
+          status: p.status >= 400 ? p.status : 500,
+        });
       }
     },
   };
 }
 
-/**
- * Async factory: discovers functions, then builds the router.
- * IMPORTANT: no top-level await in this module (prevents discovery deadlocks during scanning).
- */
 export async function createAzureFunctionsRouter(
   options: CreateRouterOptions = {},
 ): Promise<AzureFunctionsRouter> {
   const rootDir = options.rootDir ?? Deno.cwd();
   const routePrefix = options.routePrefix ?? resolveRoutePrefixFromEnv("api");
   const functions = await discoverFunctions(rootDir);
+
   return buildAzureFunctionsRouter(functions, {
     routePrefix,
     maxInvokeBodyBytes: options.maxInvokeBodyBytes,

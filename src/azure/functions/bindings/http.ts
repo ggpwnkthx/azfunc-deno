@@ -1,4 +1,5 @@
 import type { AuthLevel, BindingBase, DataTypeHint } from "./types.ts";
+import { isRecord } from "./guards.ts";
 
 /* ----------------------------- HTTP bindings ----------------------------- */
 
@@ -6,10 +7,6 @@ export interface HttpTriggerBinding extends BindingBase {
   type: "httpTrigger";
   direction: "in";
   authLevel: AuthLevel;
-  /**
-   * Optional per host docs/examples (they show a minimal object),
-   * but we strongly recommend setting it in your codebase.
-   */
   route?: string;
   methods?: readonly string[];
   webHookType?: string;
@@ -21,10 +18,6 @@ export interface HttpOutputBinding extends BindingBase {
 }
 
 /* ------------------------------ Type guards ------------------------------ */
-
-function isRecord(obj: unknown): obj is Record<string, unknown> {
-  return !!obj && typeof obj === "object" && !Array.isArray(obj);
-}
 
 export function isHttpTriggerBinding(obj: unknown): obj is HttpTriggerBinding {
   if (!isRecord(obj)) return false;

@@ -4,6 +4,12 @@ export type AppErrorCode =
   | "NOT_FOUND"
   | "INTERNAL";
 
+export type ErrorPayload = {
+  error: AppErrorCode;
+  message: string;
+  details?: unknown;
+};
+
 export class AppError extends Error {
   readonly code: AppErrorCode;
   readonly status: number;
@@ -35,21 +41,33 @@ function defaultStatus(code: AppErrorCode): number {
   }
 }
 
-export function toErrorResponse(err: unknown): Response {
+export function toErrorPayload(
+  err: unknown,
+): { status: number; body: ErrorPayload } {
   if (err instanceof AppError) {
-    return Response.json(
-      {
+    return {
+      status: err.status,
+      body: {
         error: err.code,
         message: err.message,
         ...(err.details !== undefined ? { details: err.details } : {}),
       },
-      { status: err.status },
-    );
+    };
   }
 
   const message = err instanceof Error ? err.message : String(err);
-  return Response.json(
-    { error: "INTERNAL", message },
-    { status: 500 },
-  );
+  return {
+    status: 500,
+    body: { error: "INTERNAL", message },
+  };
+}
+
+/**
+ * Generic JSON error response (useful for local debugging, non-host endpoints, etc.).
+ * NOTE: For HTTP-trigger custom-handler invocations, prefer returning an InvokeResponse
+ * where the error is encoded into the HTTP output binding.
+ */
+export function toErrorResponse(err: unknown): Response {
+  const p = toErrorPayload(err);
+  return Response.json(p.body, { status: p.status });
 }

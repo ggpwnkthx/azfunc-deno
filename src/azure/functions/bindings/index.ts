@@ -65,7 +65,48 @@ export type {
   TwilioSmsOutputBinding,
 } from "./notifications.ts";
 
+import type { CustomBinding } from "./types.ts";
+
 /* --------------------------------- Unions -------------------------------- */
+
+import type { HttpOutputBinding, HttpTriggerBinding } from "./http.ts";
+import type {
+  BlobInputBinding,
+  BlobOutputBinding,
+  BlobTriggerBinding,
+  QueueOutputBinding,
+  QueueTriggerBinding,
+  TableInputBinding,
+  TableOutputBinding,
+} from "./storage.ts";
+import type {
+  ServiceBusOutputBinding,
+  ServiceBusTriggerBinding,
+} from "./service-bus.ts";
+import type {
+  EventHubOutputBinding,
+  EventHubTriggerBinding,
+} from "./event-hub.ts";
+import type { ManualTriggerBinding, TimerTriggerBinding } from "./timer.ts";
+import type {
+  DocumentDBInputBinding,
+  DocumentDBOutputBinding,
+  KustoInputBinding,
+  KustoOutputBinding,
+  MobileTableInputBinding,
+  MobileTableOutputBinding,
+  MySqlInputBinding,
+  MySqlOutputBinding,
+  MySqlTriggerBinding,
+  SqlInputBinding,
+  SqlOutputBinding,
+  SqlTriggerBinding,
+} from "./database.ts";
+import type {
+  NotificationHubOutputBinding,
+  SendGridOutputBinding,
+  TwilioSmsOutputBinding,
+} from "./notifications.ts";
 
 export type Binding =
   | HttpTriggerBinding
@@ -97,7 +138,7 @@ export type Binding =
   | KustoOutputBinding
   | MySqlTriggerBinding
   | MySqlInputBinding
-  | SqlOutputBinding
+  | MySqlOutputBinding
   | CustomBinding;
 
 export interface RetryPolicy {
@@ -110,8 +151,6 @@ export interface RetryPolicy {
 
 export interface FunctionJson {
   bindings: Binding[];
-
-  // Common function-level config (documented in the host wiki + schema)
   disabled?: boolean;
   excluded?: boolean;
   scriptFile?: string;
@@ -122,9 +161,7 @@ export interface FunctionJson {
 
 /* ------------------------------ Type guards ------------------------------ */
 
-function isRecord(obj: unknown): obj is Record<string, unknown> {
-  return !!obj && typeof obj === "object" && !Array.isArray(obj);
-}
+import { isRecord } from "./guards.ts";
 
 export function isBinding(obj: unknown): obj is Binding {
   if (!isRecord(obj)) return false;
@@ -139,51 +176,11 @@ export function isBinding(obj: unknown): obj is Binding {
 
 /* ------------------------------- Builders -------------------------------- */
 
-import type { CustomBinding } from "./types.ts";
-import { httpBindings, HttpOutputBinding, HttpTriggerBinding } from "./http.ts";
-import {
-  ManualTriggerBinding,
-  timerBindings,
-  TimerTriggerBinding,
-} from "./timer.ts";
-import {
-  BlobInputBinding,
-  BlobOutputBinding,
-  BlobTriggerBinding,
-  QueueOutputBinding,
-  QueueTriggerBinding,
-  storageBindings,
-  TableInputBinding,
-  TableOutputBinding,
-} from "./storage.ts";
-import {
-  serviceBusBindings,
-  ServiceBusOutputBinding,
-  ServiceBusTriggerBinding,
-} from "./service-bus.ts";
-import {
-  eventHubBindings,
-  EventHubOutputBinding,
-  EventHubTriggerBinding,
-} from "./event-hub.ts";
-import {
-  DocumentDBInputBinding,
-  DocumentDBOutputBinding,
-  KustoInputBinding,
-  KustoOutputBinding,
-  MobileTableInputBinding,
-  MobileTableOutputBinding,
-  MySqlInputBinding,
-  MySqlTriggerBinding,
-  SqlInputBinding,
-  SqlOutputBinding,
-  SqlTriggerBinding,
-} from "./database.ts";
-import {
-  NotificationHubOutputBinding,
-  SendGridOutputBinding,
-  TwilioSmsOutputBinding,
-} from "./notifications.ts";
+import { httpBindings } from "./http.ts";
+import { timerBindings } from "./timer.ts";
+import { storageBindings } from "./storage.ts";
+import { serviceBusBindings } from "./service-bus.ts";
+import { eventHubBindings } from "./event-hub.ts";
 
 export const bindings = {
   ...httpBindings,

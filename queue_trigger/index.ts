@@ -37,7 +37,7 @@ export const queueTrigger = defineTriggerFunction<
     ],
   },
   handler(payload: InvokeRequest<QueueTriggerData>): QueueTriggerResponse {
-    let queueItem: JsonValue = payload.Data.item;
+    let queueItem = payload.Data.item;
 
     // Normalize input: Azure Functions may JSON-encode queue items as strings
     if (typeof queueItem === "string") {
@@ -52,9 +52,7 @@ export const queueTrigger = defineTriggerFunction<
       }
     }
 
-    const outputValue: JsonValue = typeof queueItem === "string"
-      ? queueItem.toUpperCase()
-      : queueItem;
+    const outputValue = queueItem;
 
     // If output binding name is "$return", the custom handler must set ReturnValue.
     return {

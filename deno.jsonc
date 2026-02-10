@@ -3,7 +3,8 @@
     "strict": true
   },
   "imports": {
-    "@azure/functions": "./src/azure/functions/mod.ts"
+    "@azure/functions": "./src/azure/functions/mod.ts",
+    "@std/path": "jsr:@std/path@^1.1.4"
   },
   "tasks": {
     // Writes ./<functionDir>/function.json for everything in src/functions/manifest.ts

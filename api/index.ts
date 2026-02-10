@@ -1,11 +1,10 @@
 import {
   bindings,
-  defineTriggerFunction,
+  defineHttpFunction,
   type HttpContext,
-  type InvokeResponse,
 } from "@azure/functions";
 
-export const api = defineTriggerFunction({
+export const api = defineHttpFunction({
   dir: "api",
   functionJson: {
     bindings: [
@@ -17,7 +16,7 @@ export const api = defineTriggerFunction({
       bindings.httpOut({ name: "res" }),
     ],
   },
-  handler(request: Request, ctx: HttpContext): InvokeResponse {
+  handler(request: Request, ctx: HttpContext): Response {
     const routeRaw = ctx.params.route ?? "";
     const route = "/" + routeRaw.replace(/^\/+/, "");
 
@@ -32,17 +31,11 @@ export const api = defineTriggerFunction({
       },
     };
 
-    // Custom handler HTTP output binding: set Outputs.<httpOutBindingName>
-    return {
-      Outputs: {
-        res: {
-          statusCode: 200,
-          headers: {
-            "Content-Type": ["application/json; charset=utf-8"],
-          },
-          body: JSON.stringify(body),
-        },
+    return Response.json(body, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
       },
-    };
+    });
   },
 });

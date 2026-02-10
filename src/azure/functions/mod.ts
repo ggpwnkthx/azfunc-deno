@@ -1,5 +1,4 @@
 // Runtime surface area: safe to import from function modules.
-// IMPORTANT: do NOT export generator/scanner/router from here (prevents TLA cycles).
 
 export * from "./bindings/index.ts";
 export * from "./define.ts";
@@ -24,8 +23,15 @@ export {
 } from "./invoke.ts";
 
 // Re-export utilities from lib/
-export type { AppErrorCode } from "./lib/errors.ts";
-export { AppError, toErrorResponse } from "./lib/errors.ts";
+export type { AppErrorCode, ErrorPayload } from "./lib/errors.ts";
+export { AppError, toErrorPayload, toErrorResponse } from "./lib/errors.ts";
 export { assert } from "./lib/validate.ts";
 export { readJsonBodyLimited, tryParseJson } from "./lib/json.ts";
-export { joinPosix } from "./lib/path.ts";
+export {
+  joinFsPath,
+  joinPosix,
+  normalizeFunctionDir,
+  relativePosix,
+  toFileUrlFromFsPath,
+  toPosixPath,
+} from "./lib/path.ts";

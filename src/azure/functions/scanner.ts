@@ -1,11 +1,10 @@
 import type { FunctionDefinition } from "./define.ts";
-import { joinPosix } from "./lib/path.ts";
+import { joinFsPath, relativePosix, toFileUrlFromFsPath } from "./lib/path.ts";
 
 const SKIP_DIRS = new Set([
   ".git",
   ".deno",
   "node_modules",
-  "src",
 ]);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -16,25 +15,16 @@ function isFunctionDefinition(v: unknown): v is FunctionDefinition {
   if (!isRecord(v)) return false;
 
   const kind = v.kind;
-  if (kind !== "trigger") return false;
-  if (typeof v.dir !== "string") return false;
+  if (kind !== "trigger" && kind !== "http") return false;
 
+  if (typeof v.dir !== "string") return false;
   if (!isRecord(v.functionJson) || !Array.isArray(v.functionJson.bindings)) {
     return false;
   }
+  if (!isRecord(v.bindings)) return false;
 
-  // handler exists and should be callable
   if (typeof v.handler !== "function") return false;
-
   return true;
-}
-
-function toFileUrl(path: string): string {
-  // Deno expects absolute file URLs. realPath also normalizes symlinks.
-  // This is intentionally simple (posix paths) since the rest of this codebase is posix-ish.
-  const abs = path.startsWith("/") ? path : joinPosix(Deno.cwd(), path);
-  const url = new URL(`file://${abs}`);
-  return url.href;
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -50,7 +40,7 @@ async function collectFromModule(
   modulePath: string,
 ): Promise<FunctionDefinition[]> {
   const defs: FunctionDefinition[] = [];
-  const mod = await import(toFileUrl(modulePath));
+  const mod = await import(toFileUrlFromFsPath(modulePath));
 
   for (const value of Object.values(mod)) {
     if (isFunctionDefinition(value)) defs.push(value);
@@ -61,33 +51,31 @@ async function collectFromModule(
 
 /**
  * Scans for function directories by looking for directories containing `index.ts`.
- * This expects to scan *within* the functions root (e.g. `<repo>/src/functions`).
+ * This expects to scan *within* the functions root (e.g. `<repo>/functions` or `<repo>/src/functions`).
  */
 export async function scanFunctionDirs(
   functionsRootDir: string,
 ): Promise<string[]> {
-  const root = functionsRootDir.replace(/\/+$/, "");
+  const rootAbs = await Deno.realPath(functionsRootDir);
   const dirs: string[] = [];
 
   async function walk(dirAbs: string): Promise<void> {
     for await (const entry of Deno.readDir(dirAbs)) {
       if (entry.isDirectory) {
         if (!SKIP_DIRS.has(entry.name)) {
-          await walk(joinPosix(dirAbs, entry.name));
+          await walk(joinFsPath(dirAbs, entry.name));
         }
         continue;
       }
 
       if (entry.isFile && entry.name === "index.ts") {
-        const rel = dirAbs.startsWith(root)
-          ? dirAbs.slice(root.length).replace(/^\/+/, "")
-          : dirAbs;
+        const rel = relativePosix(rootAbs, dirAbs).replace(/^\/+/, "");
         dirs.push(rel);
       }
     }
   }
 
-  await walk(root);
+  await walk(rootAbs);
   return dirs.sort();
 }
 
@@ -100,7 +88,8 @@ export async function scanFunctionDirs(
 export async function discoverFunctions(
   functionsRoot: string,
 ): Promise<FunctionDefinition[]> {
-  const manifestPath = joinPosix(functionsRoot, "manifest.ts");
+  const rootAbs = await Deno.realPath(functionsRoot);
+  const manifestPath = joinFsPath(rootAbs, "manifest.ts");
 
   // 1) Manifest (fast path)
   if (await fileExists(manifestPath)) {
@@ -110,15 +99,16 @@ export async function discoverFunctions(
 
   // 2) Auto-discovery
   const discovered: FunctionDefinition[] = [];
-  const functionDirs = await scanFunctionDirs(functionsRoot);
+  const functionDirs = await scanFunctionDirs(rootAbs);
 
   for (const relDir of functionDirs) {
-    const indexPath = joinPosix(functionsRoot, relDir, "index.ts");
+    const indexPath = joinFsPath(rootAbs, relDir, "index.ts");
     try {
       const defs = await collectFromModule(indexPath);
       discovered.push(...defs);
     } catch {
-      // ignore unreadable/broken modules
+      // Production choice: ignore unreadable/broken modules (keeps boot resilient).
+      // If you prefer “fail fast”, remove this catch and let it throw.
     }
   }
 

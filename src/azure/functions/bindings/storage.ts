@@ -1,4 +1,5 @@
 import type { BindingBase, DataTypeHint } from "./types.ts";
+import { isRecord } from "./guards.ts";
 
 /* ---------------------------- Storage bindings --------------------------- */
 
@@ -44,7 +45,6 @@ export interface TableInputBinding extends BindingBase {
   partitionKey?: string;
   rowKey?: string;
   connection: string;
-  // query-ish options (schema mentions `take`/`filter`)
   take?: string;
   filter?: string;
 }
@@ -59,10 +59,6 @@ export interface TableOutputBinding extends BindingBase {
 }
 
 /* ------------------------------ Type guards ------------------------------ */
-
-function isRecord(obj: unknown): obj is Record<string, unknown> {
-  return !!obj && typeof obj === "object" && !Array.isArray(obj);
-}
 
 export function isBlobTriggerBinding(obj: unknown): obj is BlobTriggerBinding {
   if (!isRecord(obj)) return false;
