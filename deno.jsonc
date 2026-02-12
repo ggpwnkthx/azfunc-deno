@@ -7,11 +7,11 @@
     "@std/path": "jsr:@std/path@^1.1.4"
   },
   "tasks": {
-    // Writes ./<functionDir>/function.json for everything in src/functions/manifest.ts
     "gen": "deno run -A ./src/azure/functions/generator.ts",
-    // Runs the custom handler server
     "serve": "deno run -A serve.ts",
-    "dev": "deno task gen && deno run -A --watch serve.ts"
+    "dev": "deno task gen && deno run -A --watch serve.ts",
+
+    "publish": "deno task gen && func azure functionapp publish"
   },
   "fmt": {
     "useTabs": false,

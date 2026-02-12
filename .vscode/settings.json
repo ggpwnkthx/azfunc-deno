@@ -2,6 +2,7 @@
   "azureFunctions.deploySubpath": ".",
   "azureFunctions.projectLanguage": "Custom",
   "azureFunctions.projectRuntime": "~4",
+  "azureFunctions.preDeployTask": "func: predeploy",
   "debug.internalConsoleOptions": "neverOpen",
   "deno.enable": true
 }

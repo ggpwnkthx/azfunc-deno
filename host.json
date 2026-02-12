@@ -1,14 +1,14 @@
 {
   "version": "2.0",
-  "extensions": {
-    "http": {
-      "routePrefix": "api"
-    }
-  },
   "customHandler": {
     "description": {
-      "defaultExecutablePath": ".deno/handler.sh"
+      "defaultExecutablePath": "bash",
+      "arguments": [".deno/handler.sh"],
+      "workingDirectory": "/home/site/wwwroot"
     }
+  },
+  "extensions": {
+    "http": { "routePrefix": "api" }
   },
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",

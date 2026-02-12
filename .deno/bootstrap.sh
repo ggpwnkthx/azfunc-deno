@@ -1,4 +1,4 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-$SCRIPT_DIR/install.sh
+chmod +x $SCRIPT_DIR/install.sh && $SCRIPT_DIR/install.sh
 cd $SCRIPT_DIR/..

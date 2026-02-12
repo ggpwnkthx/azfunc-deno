@@ -10,7 +10,7 @@ export const api = defineHttpFunction({
     bindings: [
       bindings.httpTrigger({
         name: "req",
-        route: "{route}",
+        route: "{*route}",
         authLevel: "anonymous",
       }),
       bindings.httpOut({ name: "res" }),

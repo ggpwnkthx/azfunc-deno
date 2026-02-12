@@ -3,7 +3,7 @@
   "tasks": [
     {
       "type": "shell",
-      "label": "start azfunc",
+      "label": "azfunc: start",
       "command": "func host start",
       "isBackground": true,
       "problemMatcher": {
@@ -14,10 +14,12 @@
           "endsPattern": "^(.*Worker process started and initialized.)$"
         }
       },
-      "presentation": {
-        "panel": "dedicated",
-        "reveal": "always"
-      }
+      "dependsOn": "azfunc: predeploy"
+    },
+    {
+      "type": "shell",
+      "label": "azfunc: predeploy",
+      "command": "deno task gen",
     }
   ]
 }

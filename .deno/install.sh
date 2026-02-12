@@ -1,5 +1,6 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+chmod +x "$SCRIPT_DIR/fetch.sh"
 
 # Only proceed if "deno" is not already present in the script directory.
 if [ ! -f "$SCRIPT_DIR/deno" ]; then
@@ -55,3 +56,5 @@ fi
 if [ ! -f /usr/bin/deno ]; then
   ln -s "$SCRIPT_DIR/deno" /usr/bin/deno
 fi
+
+chmod +x "$SCRIPT_DIR/deno"
