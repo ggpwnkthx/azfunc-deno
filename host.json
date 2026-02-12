@@ -2,9 +2,7 @@
   "version": "2.0",
   "customHandler": {
     "description": {
-      "defaultExecutablePath": "bash",
-      "arguments": [".deno/handler.sh"],
-      "workingDirectory": "/home/site/wwwroot"
+      "defaultExecutablePath": "handler"
     }
   },
   "extensions": {

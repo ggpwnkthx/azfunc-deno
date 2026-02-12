@@ -38,6 +38,15 @@ export type TriggerHandler<
   | ((payload: TPayload) => TResult | Promise<TResult>)
   | ((payload: TPayload, ctx: TriggerContext) => TResult | Promise<TResult>);
 
+/**
+ * Internal trigger handler signature used by the router/registry.
+ * We intentionally erase per-function payload typing here to avoid invariance issues.
+ */
+export type TriggerHandlerInternal = (
+  payload: InvokeRequest,
+  ctx: TriggerContext,
+) => TriggerHandlerResult;
+
 export interface FunctionBindingsIndex {
   all: readonly Binding[];
   /** The inferred trigger binding */
@@ -70,12 +79,13 @@ export interface HttpFunctionDefinition extends FunctionDefinitionBase {
   };
 }
 
-export interface TriggerFunctionDefinition<
-  TPayload extends InvokeRequest = InvokeRequest,
-  TResult extends InvokeResponse = InvokeResponse,
-> extends FunctionDefinitionBase {
+/**
+ * Note: non-generic on purpose.
+ * Per-function payload typing is enforced at define-time, not at registry time.
+ */
+export interface TriggerFunctionDefinition extends FunctionDefinitionBase {
   kind: "trigger";
-  handler: TriggerHandler<TPayload, TResult>;
+  handler: TriggerHandlerInternal;
 }
 
 export type FunctionDefinition =
@@ -206,9 +216,19 @@ export function defineHttpFunction(options: {
   return def;
 }
 
+type TriggerHandlerOne<TPayload extends InvokeRequest, TResult extends InvokeResponse> =
+  (payload: TPayload) => TResult | Promise<TResult>;
+
+type TriggerHandlerTwo<TPayload extends InvokeRequest, TResult extends InvokeResponse> =
+  (payload: TPayload, ctx: TriggerContext) => TResult | Promise<TResult>;
+
 /**
  * Generic trigger constructor (abstract over trigger types).
  * This is the one you want for non-HTTP triggers.
+ *
+ * NOTE:
+ * - The returned FunctionDefinition erases the specific payload type for registry compatibility.
+ * - You still get strong typing inside your handler via the generic parameters.
  */
 export function defineTriggerFunction<
   TPayload extends InvokeRequest = InvokeRequest,
@@ -217,7 +237,7 @@ export function defineTriggerFunction<
   dir: string;
   functionJson: FunctionJson;
   handler: TriggerHandler<TPayload, TResult>;
-}): TriggerFunctionDefinition<TPayload, TResult> {
+}): TriggerFunctionDefinition {
   const dir = normalizeFunctionDir(options.dir);
   assertValidFunctionJson(options.functionJson);
 
@@ -230,11 +250,30 @@ export function defineTriggerFunction<
     );
   }
 
-  const def: TriggerFunctionDefinition<TPayload, TResult> = withBindingLookups({
+  // Wrap the typed handler into an internal erased signature.
+  const internalHandler: TriggerHandlerInternal = async (
+    payload: InvokeRequest,
+    ctx: TriggerContext,
+  ): Promise<InvokeResponse> => {
+    const typedPayload = payload as unknown as TPayload;
+
+    const out =
+      options.handler.length >= 2
+        ? (options.handler as TriggerHandlerTwo<TPayload, TResult>)(
+          typedPayload,
+          ctx,
+        )
+        : (options.handler as TriggerHandlerOne<TPayload, TResult>)(typedPayload);
+
+    const resolved = await out;
+    return resolved as unknown as InvokeResponse;
+  };
+
+  const def: TriggerFunctionDefinition = withBindingLookups({
     dir,
     functionJson: options.functionJson,
     kind: "trigger",
-    handler: options.handler,
+    handler: internalHandler,
     bindings,
   });
 

@@ -1,8 +1,8 @@
-.claude
-.devcontainer
-.git*
-.vscode
-local.settings.json
-example.local.settings.json
+.*
+*.settings.json
+*.jsonc
+*.test
+*.md
+src
 test
 node_modules

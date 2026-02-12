@@ -1,7 +1,6 @@
 import type { FunctionDefinition } from "./define.ts";
 import type { FunctionJson } from "./bindings/index.ts";
 import { AppError } from "./lib/errors.ts";
-import { discoverFunctions } from "./scanner.ts";
 import { joinFsPath } from "./lib/path.ts";
 
 export interface GenerateOptions {
@@ -32,6 +31,13 @@ async function atomicWriteTextFile(path: string, text: string): Promise<void> {
   await Deno.rename(tmp, path);
 }
 
+/**
+ * Write `function.json` for each FunctionDefinition.
+ *
+ * Permissions:
+ * - `--allow-read` (only if validateDirs is true and ensureDirs is false)
+ * - `--allow-write` (always, to create dirs/files)
+ */
 export async function writeFunctionJsonFiles(
   functions: readonly FunctionDefinition[],
   options: GenerateOptions = {},
@@ -73,9 +79,4 @@ export async function writeFunctionJsonFiles(
   }
 
   return written;
-}
-
-if (import.meta.main) {
-  const functions = await discoverFunctions(Deno.cwd());
-  await writeFunctionJsonFiles(functions, { rootDir: Deno.cwd() });
 }

@@ -1,9 +1,6 @@
 import type {
   FunctionDefinition,
   HttpFunctionDefinition,
-  HttpHandler,
-  TriggerFunctionDefinition,
-  TriggerHandler,
 } from "./define.ts";
 import {
   asAzureHttpRequestData,
@@ -14,16 +11,11 @@ import {
 } from "./invoke.ts";
 import { readJsonBodyLimited } from "./lib/json.ts";
 import { toErrorPayload } from "./lib/errors.ts";
-import { discoverFunctions } from "./scanner.ts";
 
-interface RouterOptions {
+export interface RouterOptions {
   routePrefix?: string;
   maxInvokeBodyBytes?: number;
   maxHttpResponseBodyBytes?: number;
-}
-
-export interface CreateRouterOptions extends RouterOptions {
-  rootDir?: string;
 }
 
 export interface AzureFunctionsRouter {
@@ -74,9 +66,7 @@ async function httpInvokeErrorResponse(
   const invokeRes = await invokeResponseFromHttpResponse(
     fn.http.outName,
     callerRes,
-    {
-      maxBodyBytes,
-    },
+    { maxBodyBytes },
   );
 
   return Response.json(invokeRes, { status: 200 });
@@ -129,12 +119,8 @@ export function buildAzureFunctionsRouter(
         const invokeReq = parseInvokeRequest(raw);
 
         if (fn.kind === "trigger") {
-          const triggerFn = fn as TriggerFunctionDefinition;
-          const ctx = { functionDir: triggerFn.dir, rawPathname: url.pathname };
-          const out = await (triggerFn.handler as TriggerHandler)(
-            invokeReq as never,
-            ctx,
-          );
+          const ctx = { functionDir: fn.dir, rawPathname: url.pathname };
+          const out = await fn.handler(invokeReq, ctx);
           return Response.json(out, { status: 200 });
         }
 
@@ -153,7 +139,7 @@ export function buildAzureFunctionsRouter(
           params: httpReqData.Params ?? {},
         };
 
-        const out = await (httpFn.handler as HttpHandler)(denoReq, ctx);
+        const out = await httpFn.handler(denoReq, ctx);
 
         const invokeRes = await coerceHttpHandlerResult(
           httpFn,
@@ -179,18 +165,4 @@ export function buildAzureFunctionsRouter(
       }
     },
   };
-}
-
-export async function createAzureFunctionsRouter(
-  options: CreateRouterOptions = {},
-): Promise<AzureFunctionsRouter> {
-  const rootDir = options.rootDir ?? Deno.cwd();
-  const routePrefix = options.routePrefix ?? resolveRoutePrefixFromEnv("api");
-  const functions = await discoverFunctions(rootDir);
-
-  return buildAzureFunctionsRouter(functions, {
-    routePrefix,
-    maxInvokeBodyBytes: options.maxInvokeBodyBytes,
-    maxHttpResponseBodyBytes: options.maxHttpResponseBodyBytes,
-  });
 }

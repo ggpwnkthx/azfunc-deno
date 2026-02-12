@@ -3,6 +3,11 @@
 export * from "./bindings/index.ts";
 export * from "./define.ts";
 
+// App / routing
+export { AzureFunctionsApp } from "./app.ts";
+export type { AzureFunctionsRouter, RouterOptions } from "./router.ts";
+export { buildAzureFunctionsRouter, resolveRoutePrefixFromEnv } from "./router.ts";
+
 // Custom handler payload types/helpers
 export type {
   AzureHttpRequestData,
