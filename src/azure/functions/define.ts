@@ -216,11 +216,15 @@ export function defineHttpFunction(options: {
   return def;
 }
 
-type TriggerHandlerOne<TPayload extends InvokeRequest, TResult extends InvokeResponse> =
-  (payload: TPayload) => TResult | Promise<TResult>;
+type TriggerHandlerOne<
+  TPayload extends InvokeRequest,
+  TResult extends InvokeResponse,
+> = (payload: TPayload) => TResult | Promise<TResult>;
 
-type TriggerHandlerTwo<TPayload extends InvokeRequest, TResult extends InvokeResponse> =
-  (payload: TPayload, ctx: TriggerContext) => TResult | Promise<TResult>;
+type TriggerHandlerTwo<
+  TPayload extends InvokeRequest,
+  TResult extends InvokeResponse,
+> = (payload: TPayload, ctx: TriggerContext) => TResult | Promise<TResult>;
 
 /**
  * Generic trigger constructor (abstract over trigger types).
@@ -257,13 +261,12 @@ export function defineTriggerFunction<
   ): Promise<InvokeResponse> => {
     const typedPayload = payload as unknown as TPayload;
 
-    const out =
-      options.handler.length >= 2
-        ? (options.handler as TriggerHandlerTwo<TPayload, TResult>)(
-          typedPayload,
-          ctx,
-        )
-        : (options.handler as TriggerHandlerOne<TPayload, TResult>)(typedPayload);
+    const out = options.handler.length >= 2
+      ? (options.handler as TriggerHandlerTwo<TPayload, TResult>)(
+        typedPayload,
+        ctx,
+      )
+      : (options.handler as TriggerHandlerOne<TPayload, TResult>)(typedPayload);
 
     const resolved = await out;
     return resolved as unknown as InvokeResponse;

@@ -19,7 +19,7 @@
     {
       "type": "shell",
       "label": "azfunc: predeploy",
-      "command": "deno task build",
+      "command": "deno task build"
     }
   ]
 }

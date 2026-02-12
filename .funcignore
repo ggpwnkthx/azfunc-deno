@@ -1,8 +1,8 @@
 .*
-*.settings.json
 *.jsonc
-*.test
 *.md
+*.settings.json
+*.ts
 src
 test
 node_modules

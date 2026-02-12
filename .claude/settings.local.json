@@ -1,16 +1,26 @@
 {
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "deno run -A .claude/hooks/deno_quality.ts"
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
-      "Bash(func:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(deno run:*)",
-      "Bash(/tmp/test_full.ts:*)",
-      "Bash(deno check:*)",
-      "Bash(deno lint:*)",
-      "Bash(ls:*)",
-      "Bash(timeout 10 deno eval:*)",
-      "Bash(timeout 5 deno eval:*)"
+      "Bash(deno fmt*)",
+      "Bash(deno lint --fix*)",
+      "Bash(deno check*)",
+      "Bash(deno task*)",
+      "Bash(func host start)"
     ]
   }
 }

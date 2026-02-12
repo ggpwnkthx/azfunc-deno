@@ -35,5 +35,5 @@
     "ghcr.io/stu-bell/devcontainer-features/claude-code:0": {},
     "ghcr.io/devcontainers/features/azure-cli:1": {}
   },
-  "postCreateCommand": ".deno/bootstrap.sh && chmod +x /usr/lib/azure-functions-core-tools/in-proc8/func"
+  "postCreateCommand": "chmod +x /usr/lib/azure-functions-core-tools/in-proc8/func"
 }

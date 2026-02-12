@@ -1,7 +1,5 @@
-import type {
-  FunctionDefinition,
-  HttpFunctionDefinition,
-} from "./define.ts";
+import { join as joinPath } from "@std/path";
+import type { FunctionDefinition, HttpFunctionDefinition } from "./define.ts";
 import {
   asAzureHttpRequestData,
   type InvokeResponse,
@@ -31,10 +29,30 @@ function extractFunctionName(pathname: string): string {
   return pathname.replace(/^\/+/, "").split("/")[0] ?? "";
 }
 
-export function resolveRoutePrefixFromEnv(fallback = "api"): string {
+export function resolveRoutePrefixFromEnv(): string | undefined {
   return Deno.env.get("AzureFunctionsJobHost__extensions__http__routePrefix") ??
-    Deno.env.get("FUNCTIONS_HTTP_ROUTE_PREFIX") ??
-    fallback;
+    Deno.env.get("FUNCTIONS_HTTP_ROUTE_PREFIX");
+}
+
+interface HostJsonConfig {
+  extensions?: {
+    http?: {
+      routePrefix?: string;
+    };
+  };
+}
+
+export function resolveRoutePrefixFromHostJson(
+  hostJsonPath: string = joinPath(Deno.cwd(), "host.json"),
+): string | undefined {
+  try {
+    const content = Deno.readTextFileSync(hostJsonPath);
+    const config: HostJsonConfig = JSON.parse(content);
+    const prefix = config.extensions?.http?.routePrefix;
+    return typeof prefix === "string" ? normalizePrefix(prefix) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function coerceHttpHandlerResult(

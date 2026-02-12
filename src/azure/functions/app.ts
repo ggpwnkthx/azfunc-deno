@@ -4,6 +4,7 @@ import type { AzureFunctionsRouter, RouterOptions } from "./router.ts";
 import {
   buildAzureFunctionsRouter,
   resolveRoutePrefixFromEnv,
+  resolveRoutePrefixFromHostJson,
 } from "./router.ts";
 import type { GenerateOptions, WrittenFile } from "./generator.ts";
 import { writeFunctionJsonFiles } from "./generator.ts";
@@ -137,7 +138,9 @@ export class AzureFunctionsApp {
 
     const routePrefix = options.routePrefix ??
       getStringFlag(args, "--routePrefix") ??
-      resolveRoutePrefixFromEnv("api");
+      resolveRoutePrefixFromEnv() ??
+      resolveRoutePrefixFromHostJson() ??
+      "api";
 
     const router = this.buildRouter({
       routePrefix,
@@ -154,7 +157,10 @@ function hasFlag(args: readonly string[], name: string): boolean {
   return args.includes(name);
 }
 
-function getStringFlag(args: readonly string[], name: string): string | undefined {
+function getStringFlag(
+  args: readonly string[],
+  name: string,
+): string | undefined {
   // Supports: --x value  OR  --x=value
   for (let i = 0; i < args.length; i++) {
     const a = args[i] ?? "";
@@ -176,7 +182,9 @@ function getIntFlag(args: readonly string[], name: string): number | undefined {
   if (s === undefined) return undefined;
 
   const n = Number.parseInt(s, 10);
-  if (!Number.isFinite(n) || String(n) !== String(Number.parseInt(String(n), 10))) {
+  if (
+    !Number.isFinite(n) || String(n) !== String(Number.parseInt(String(n), 10))
+  ) {
     throw new AppError("DEFINITION", `Invalid ${name} value: ${s}`);
   }
   if (n <= 0 || n > 65535) {
