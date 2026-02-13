@@ -1,7 +1,13 @@
 import { join as joinPath } from "@std/path";
-import type { FunctionDefinition, HttpFunctionDefinition } from "./define.ts";
+import type {
+  AppContext,
+  FunctionDefinition,
+  HttpFunctionDefinition,
+} from "./define.ts";
+import type { AzureFunctionsApp } from "./app.ts";
 import {
   asAzureHttpRequestData,
+  type InvokeRequest,
   type InvokeResponse,
   invokeResponseFromHttpResponse,
   parseInvokeRequest,
@@ -18,6 +24,17 @@ export interface RouterOptions {
 
 export interface AzureFunctionsRouter {
   handle(req: Request): Promise<Response>;
+}
+
+/**
+ * Create an AppContext from an AzureFunctionsApp instance.
+ */
+function createAppContext(app: AzureFunctionsApp): AppContext {
+  return {
+    app: {
+      list: () => app.list(),
+    },
+  };
 }
 
 function normalizePrefix(prefix: string): string {
@@ -93,14 +110,17 @@ async function httpInvokeErrorResponse(
 export function buildAzureFunctionsRouter(
   functions: readonly FunctionDefinition[],
   options: RouterOptions = {},
+  app?: AzureFunctionsApp,
 ): AzureFunctionsRouter {
   const routePrefix = normalizePrefix(options.routePrefix ?? "api");
   const maxInvokeBodyBytes = options.maxInvokeBodyBytes ?? 1024 * 1024;
   const maxHttpResponseBodyBytes = options.maxHttpResponseBodyBytes ??
     4 * 1024 * 1024;
 
+  const appCtx = app ? createAppContext(app) : undefined;
+
   const map = new Map<string, FunctionDefinition>();
-  for (const fn of functions) map.set(fn.dir, fn);
+  for (const fn of functions) map.set(fn.name, fn);
 
   return {
     async handle(req: Request): Promise<Response> {
@@ -137,8 +157,13 @@ export function buildAzureFunctionsRouter(
         const invokeReq = parseInvokeRequest(raw);
 
         if (fn.kind === "trigger") {
-          const ctx = { functionDir: fn.dir, rawPathname: url.pathname };
-          const out = await fn.handler(invokeReq, ctx);
+          const ctx = { functionDir: fn.name, rawPathname: url.pathname };
+          const out = await invokeTriggerHandler(
+            fn.handler as unknown as (...args: unknown[]) => unknown,
+            invokeReq,
+            ctx,
+            appCtx,
+          );
           return Response.json(out, { status: 200 });
         }
 
@@ -151,13 +176,18 @@ export function buildAzureFunctionsRouter(
         const rawPathname = new URL(httpReqData.Url).pathname;
 
         const ctx = {
-          functionDir: httpFn.dir,
+          functionDir: httpFn.name,
           routePrefix,
           rawPathname,
           params: httpReqData.Params ?? {},
         };
 
-        const out = await httpFn.handler(denoReq, ctx);
+        const out = await invokeHandler(
+          httpFn.handler as unknown as (...args: unknown[]) => unknown,
+          denoReq,
+          ctx,
+          appCtx,
+        );
 
         const invokeRes = await coerceHttpHandlerResult(
           httpFn,
@@ -183,4 +213,43 @@ export function buildAzureFunctionsRouter(
       }
     },
   };
+}
+
+/**
+ * Invoke a handler with variable arity support.
+ * Handlers can receive 1-3 parameters depending on their signature.
+ */
+async function invokeHandler(
+  handler: (...args: unknown[]) => unknown,
+  req: Request,
+  ctx: import("./define.ts").HttpContext,
+  appCtx?: AppContext,
+): Promise<Response | InvokeResponse> {
+  const arity = handler.length;
+  if (arity >= 3 && appCtx) {
+    return await handler(req, ctx, appCtx) as Response | InvokeResponse;
+  } else if (arity === 2) {
+    return await handler(req, ctx) as Response | InvokeResponse;
+  } else {
+    return await handler(req) as Response | InvokeResponse;
+  }
+}
+
+/**
+ * Invoke a trigger handler with variable arity support.
+ */
+async function invokeTriggerHandler(
+  handler: (...args: unknown[]) => unknown,
+  payload: InvokeRequest,
+  ctx: import("./define.ts").TriggerContext,
+  appCtx?: AppContext,
+): Promise<InvokeResponse> {
+  const arity = handler.length;
+  if (arity >= 3 && appCtx) {
+    return await handler(payload, ctx, appCtx) as InvokeResponse;
+  } else if (arity === 2) {
+    return await handler(payload, ctx) as InvokeResponse;
+  } else {
+    return await handler(payload) as InvokeResponse;
+  }
 }

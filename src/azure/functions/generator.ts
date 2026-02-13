@@ -21,7 +21,7 @@ export interface GenerateOptions {
 export interface WrittenFile {
   dir: string;
   path: string;
-  functionJson: FunctionJson;
+  config: FunctionJson;
 }
 
 async function atomicWriteTextFile(path: string, text: string): Promise<void> {
@@ -48,16 +48,19 @@ export async function writeFunctionJsonFiles(
 
   const seen = new Set<string>();
   for (const fn of functions) {
-    if (seen.has(fn.dir)) {
-      throw new AppError("DEFINITION", `Duplicate function dir: "${fn.dir}".`);
+    if (seen.has(fn.name)) {
+      throw new AppError(
+        "DEFINITION",
+        `Duplicate function name: "${fn.name}".`,
+      );
     }
-    seen.add(fn.dir);
+    seen.add(fn.name);
   }
 
   const written: WrittenFile[] = [];
 
   for (const fn of functions) {
-    const functionDirPath = joinFsPath(rootDir, fn.dir);
+    const functionDirPath = joinFsPath(rootDir, fn.name);
 
     if (ensureDirs) {
       await Deno.mkdir(functionDirPath, { recursive: true });
@@ -72,10 +75,14 @@ export async function writeFunctionJsonFiles(
     }
 
     const outPath = joinFsPath(functionDirPath, "function.json");
-    const jsonText = JSON.stringify(fn.functionJson, null, 2) + "\n";
+    const jsonText = JSON.stringify(fn.config, null, 2) + "\n";
     await atomicWriteTextFile(outPath, jsonText);
 
-    written.push({ dir: fn.dir, path: outPath, functionJson: fn.functionJson });
+    written.push({
+      dir: fn.name,
+      path: outPath,
+      config: fn.config,
+    });
   }
 
   return written;

@@ -22,8 +22,8 @@ export default defineTriggerFunction<
   InvokeRequest<BlobTriggerData, BlobTriggerMetadata>,
   BlobTriggerResponse
 >({
-  dir: "blob_trigger",
-  functionJson: {
+  name: "blob_trigger",
+  config: {
     bindings: [
       bindings.blobTrigger({
         name: "myBlob",

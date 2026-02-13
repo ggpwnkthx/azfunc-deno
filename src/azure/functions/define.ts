@@ -1,3 +1,4 @@
+import type { AzureFunctionsApp } from "./app.ts";
 import type { Binding, FunctionJson } from "./bindings/index.ts";
 import { isHttpOutputBinding, isHttpTriggerBinding } from "./bindings/index.ts";
 import type { InvokeRequest, InvokeResponse } from "./invoke.ts";
@@ -5,6 +6,14 @@ import { AppError } from "./lib/errors.ts";
 import { normalizeFunctionDir } from "./lib/path.ts";
 
 export type FunctionKind = "http" | "trigger";
+
+/**
+ * App-level context passed to handlers.
+ * Provides read-only access to the registered app instance.
+ */
+export interface AppContext {
+  readonly app: Readonly<Pick<AzureFunctionsApp, "list">>;
+}
 
 export interface HttpContext {
   functionDir: string;
@@ -27,16 +36,54 @@ export type TriggerHandlerResult =
   | InvokeResponse
   | Promise<InvokeResponse>;
 
+// Handler arity types - handlers can receive 1-3 params
+type HttpHandlerArity1 = (req: Request) => HttpHandlerResult;
+type HttpHandlerArity2 = (req: Request, ctx: HttpContext) => HttpHandlerResult;
+type HttpHandlerArity2App = (
+  req: Request,
+  appCtx: AppContext,
+) => HttpHandlerResult;
+type HttpHandlerArity3 = (
+  req: Request,
+  ctx: HttpContext,
+  appCtx: AppContext,
+) => HttpHandlerResult;
+
 export type HttpHandler =
-  | ((req: Request) => HttpHandlerResult)
-  | ((req: Request, ctx: HttpContext) => HttpHandlerResult);
+  | HttpHandlerArity1
+  | HttpHandlerArity2
+  | HttpHandlerArity2App
+  | HttpHandlerArity3;
+
+type TriggerHandlerArity1<
+  TPayload extends InvokeRequest,
+  TResult extends InvokeResponse,
+> = (payload: TPayload) => TResult | Promise<TResult>;
+type TriggerHandlerArity2<
+  TPayload extends InvokeRequest,
+  TResult extends InvokeResponse,
+> = (payload: TPayload, ctx: TriggerContext) => TResult | Promise<TResult>;
+type TriggerHandlerArity2App<
+  TPayload extends InvokeRequest,
+  TResult extends InvokeResponse,
+> = (payload: TPayload, appCtx: AppContext) => TResult | Promise<TResult>;
+type TriggerHandlerArity3<
+  TPayload extends InvokeRequest,
+  TResult extends InvokeResponse,
+> = (
+  payload: TPayload,
+  ctx: TriggerContext,
+  appCtx: AppContext,
+) => TResult | Promise<TResult>;
 
 export type TriggerHandler<
   TPayload extends InvokeRequest = InvokeRequest,
   TResult extends InvokeResponse = InvokeResponse,
 > =
-  | ((payload: TPayload) => TResult | Promise<TResult>)
-  | ((payload: TPayload, ctx: TriggerContext) => TResult | Promise<TResult>);
+  | TriggerHandlerArity1<TPayload, TResult>
+  | TriggerHandlerArity2<TPayload, TResult>
+  | TriggerHandlerArity2App<TPayload, TResult>
+  | TriggerHandlerArity3<TPayload, TResult>;
 
 /**
  * Internal trigger handler signature used by the router/registry.
@@ -45,6 +92,7 @@ export type TriggerHandler<
 export type TriggerHandlerInternal = (
   payload: InvokeRequest,
   ctx: TriggerContext,
+  appCtx: AppContext,
 ) => TriggerHandlerResult;
 
 export interface FunctionBindingsIndex {
@@ -64,8 +112,8 @@ export type BindingLookupMethods = {
 };
 
 export type FunctionDefinitionBase = {
-  dir: string;
-  functionJson: FunctionJson;
+  name: string;
+  config: FunctionJson;
   kind: FunctionKind;
   bindings: FunctionBindingsIndex;
 } & BindingLookupMethods;
@@ -92,12 +140,12 @@ export type FunctionDefinition =
   | HttpFunctionDefinition
   | TriggerFunctionDefinition;
 
-function assertValidFunctionJson(functionJson: FunctionJson): void {
-  if (!functionJson || !Array.isArray(functionJson.bindings)) {
-    throw new AppError("DEFINITION", "functionJson.bindings missing.");
+function assertValidFunctionJson(config: FunctionJson): void {
+  if (!config || !Array.isArray(config.bindings)) {
+    throw new AppError("DEFINITION", "config.bindings missing.");
   }
-  if (functionJson.bindings.length === 0) {
-    throw new AppError("DEFINITION", "functionJson.bindings is empty.");
+  if (config.bindings.length === 0) {
+    throw new AppError("DEFINITION", "config.bindings is empty.");
   }
 }
 
@@ -173,14 +221,14 @@ function withBindingLookups<T extends { bindings: FunctionBindingsIndex }>(
  * so we keep an explicit constructor for it.
  */
 export function defineHttpFunction(options: {
-  dir: string;
-  functionJson: FunctionJson;
+  name: string;
+  config: FunctionJson;
   handler: HttpHandler;
 }): HttpFunctionDefinition {
-  const dir = normalizeFunctionDir(options.dir);
-  assertValidFunctionJson(options.functionJson);
+  const dir = normalizeFunctionDir(options.name);
+  assertValidFunctionJson(options.config);
 
-  const bindings = indexBindings(options.functionJson.bindings);
+  const bindings = indexBindings(options.config.bindings);
 
   const httpTriggers = bindings.all.filter(isHttpTriggerBinding);
   if (httpTriggers.length !== 1) {
@@ -202,8 +250,8 @@ export function defineHttpFunction(options: {
   const httpOut = httpOuts[0];
 
   const def: HttpFunctionDefinition = withBindingLookups({
-    dir,
-    functionJson: options.functionJson,
+    name: dir,
+    config: options.config,
     kind: "http",
     handler: options.handler,
     bindings,
@@ -238,14 +286,14 @@ export function defineTriggerFunction<
   TPayload extends InvokeRequest = InvokeRequest,
   TResult extends InvokeResponse = InvokeResponse,
 >(options: {
-  dir: string;
-  functionJson: FunctionJson;
+  name: string;
+  config: FunctionJson;
   handler: TriggerHandler<TPayload, TResult>;
 }): TriggerFunctionDefinition {
-  const dir = normalizeFunctionDir(options.dir);
-  assertValidFunctionJson(options.functionJson);
+  const dir = normalizeFunctionDir(options.name);
+  assertValidFunctionJson(options.config);
 
-  const bindings = indexBindings(options.functionJson.bindings);
+  const bindings = indexBindings(options.config.bindings);
 
   if (bindings.all.some(isHttpTriggerBinding)) {
     throw new AppError(
@@ -258,23 +306,37 @@ export function defineTriggerFunction<
   const internalHandler: TriggerHandlerInternal = async (
     payload: InvokeRequest,
     ctx: TriggerContext,
+    appCtx: AppContext,
   ): Promise<InvokeResponse> => {
     const typedPayload = payload as unknown as TPayload;
+    const arity = options.handler.length;
 
-    const out = options.handler.length >= 2
-      ? (options.handler as TriggerHandlerTwo<TPayload, TResult>)(
+    let out: TResult | Promise<TResult>;
+    if (arity >= 3) {
+      out = (options.handler as TriggerHandlerArity3<TPayload, TResult>)(
         typedPayload,
         ctx,
-      )
-      : (options.handler as TriggerHandlerOne<TPayload, TResult>)(typedPayload);
+        appCtx,
+      );
+    } else if (arity === 2) {
+      // Could be (payload, ctx) or (payload, appCtx) - ctx is the second param
+      out = (options.handler as TriggerHandlerArity2<TPayload, TResult>)(
+        typedPayload,
+        ctx,
+      );
+    } else {
+      out = (options.handler as TriggerHandlerArity1<TPayload, TResult>)(
+        typedPayload,
+      );
+    }
 
     const resolved = await out;
     return resolved as unknown as InvokeResponse;
   };
 
   const def: TriggerFunctionDefinition = withBindingLookups({
-    dir,
-    functionJson: options.functionJson,
+    name: dir,
+    config: options.config,
     kind: "trigger",
     handler: internalHandler,
     bindings,

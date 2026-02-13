@@ -65,7 +65,7 @@ export class AzureFunctionsApp {
   readonly #byDir = new Map<string, FunctionDefinition>();
 
   register(fn: FunctionDefinition): this {
-    const dir = fn.dir;
+    const dir = fn.name;
     const existing = this.#byDir.get(dir);
     if (existing) {
       throw new AppError(
@@ -83,11 +83,13 @@ export class AzureFunctionsApp {
   }
 
   list(): readonly FunctionDefinition[] {
-    return [...this.#byDir.values()].sort((a, b) => a.dir.localeCompare(b.dir));
+    return [...this.#byDir.values()].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   }
 
   buildRouter(options: RouterOptions = {}): AzureFunctionsRouter {
-    return buildAzureFunctionsRouter(this.list(), options);
+    return buildAzureFunctionsRouter(this.list(), options, this);
   }
 
   /**

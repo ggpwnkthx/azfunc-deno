@@ -21,8 +21,8 @@ export default defineTriggerFunction<
   InvokeRequest<QueueTriggerData>,
   QueueTriggerResponse
 >({
-  dir: "queue_trigger",
-  functionJson: {
+  name: "queue_trigger",
+  config: {
     bindings: [
       bindings.queueTrigger({
         name: "item",

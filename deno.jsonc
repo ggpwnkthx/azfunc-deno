@@ -4,13 +4,14 @@
   },
   "imports": {
     "@azure/functions": "./src/azure/functions/mod.ts",
+    "@azure/functions/lib/": "./src/azure/functions/lib/",
     "@std/path": "jsr:@std/path@^1.1.4"
   },
   "tasks": {
     "gen": "deno run -A handler.ts --gen",
     "dev": "deno task gen && deno run -A --watch handler.ts",
     "build": "deno task gen && deno compile -A --output ./handler ./handler.ts",
-    "publish": "deno task build && func azure functionapp publish"
+    "publish": "(az account show || az login) && deno task build && func azure functionapp publish"
   },
   "fmt": {
     "useTabs": false,
