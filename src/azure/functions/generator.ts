@@ -1,5 +1,5 @@
 import type { FunctionDefinition } from "./define.ts";
-import type { FunctionJson } from "./bindings/index.ts";
+import type { FunctionConfig, FunctionJson } from "./bindings/index.ts";
 import { AppError } from "./lib/errors.ts";
 import { joinFsPath } from "./lib/path.ts";
 
@@ -21,7 +21,7 @@ export interface GenerateOptions {
 export interface WrittenFile {
   dir: string;
   path: string;
-  config: FunctionJson;
+  config: FunctionConfig;
 }
 
 async function atomicWriteTextFile(path: string, text: string): Promise<void> {
@@ -75,7 +75,12 @@ export async function writeFunctionJsonFiles(
     }
 
     const outPath = joinFsPath(functionDirPath, "function.json");
-    const jsonText = JSON.stringify(fn.config, null, 2) + "\n";
+    // Reconstruct full FunctionJson from config + bindings
+    const fullConfig: FunctionJson = {
+      ...fn.config,
+      bindings: [...fn.bindings.all],
+    };
+    const jsonText = JSON.stringify(fullConfig, null, 2) + "\n";
     await atomicWriteTextFile(outPath, jsonText);
 
     written.push({

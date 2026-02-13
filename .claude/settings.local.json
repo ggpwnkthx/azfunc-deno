@@ -1,4 +1,17 @@
 {
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(deno fmt*)",
+      "Bash(deno lint --fix*)",
+      "Bash(deno check*)",
+      "Bash(deno task*)",
+      "Bash(func host start)",
+      "Bash(deno lint src/azure/functions/ src/functions/)",
+      "Bash(deno lint:*)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
@@ -18,17 +31,6 @@
           }
         ]
       }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "WebSearch",
-      "WebFetch(domain:github.com)",
-      "Bash(deno fmt*)",
-      "Bash(deno lint --fix*)",
-      "Bash(deno check*)",
-      "Bash(deno task*)",
-      "Bash(func host start)"
     ]
   }
 }

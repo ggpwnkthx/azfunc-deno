@@ -1,32 +1,43 @@
-import type { BindingBase } from "./types.ts";
+import type { BindingFromApi, OutBinding } from "./types.ts";
+import { defineOutBinding } from "./types.ts";
 
-/* ---------------------- Notification / Email bindings -------------------- */
-
-export interface NotificationHubOutputBinding extends BindingBase {
-  type: "notificationHub";
-  direction: "out";
+export type NotificationHubOutputBinding = OutBinding<"notificationHub", {
   tagExpression: string;
   hubName: string;
   connection: string;
   platform?: "apns" | "adm" | "gcm" | "wns" | "mpns";
-}
+}>;
 
-export interface TwilioSmsOutputBinding extends BindingBase {
-  type: "twilioSms";
-  direction: "out";
+export type TwilioSmsOutputBinding = OutBinding<"twilioSms", {
   accountSid: string;
   authToken: string;
   to: string;
   from: string;
   body?: string;
-}
+}>;
 
-export interface SendGridOutputBinding extends BindingBase {
-  type: "sendGrid";
-  direction: "out";
+export type SendGridOutputBinding = OutBinding<"sendGrid", {
   apiKey: string;
   to: string;
   from: string;
   subject: string;
   text: string;
-}
+}>;
+
+const notificationHub = defineOutBinding<NotificationHubOutputBinding>(
+  "notificationHub",
+);
+const twilioSms = defineOutBinding<TwilioSmsOutputBinding>("twilioSms");
+const sendGrid = defineOutBinding<SendGridOutputBinding>("sendGrid");
+
+export const isNotificationHubOutputBinding = notificationHub.is;
+export const isTwilioSmsOutputBinding = twilioSms.is;
+export const isSendGridOutputBinding = sendGrid.is;
+
+export const notifications = {
+  notificationHub: notificationHub.build,
+  twilioSms: twilioSms.build,
+  sendGrid: sendGrid.build,
+} as const;
+
+export type NotificationBinding = BindingFromApi<typeof notifications>;

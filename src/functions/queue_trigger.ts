@@ -1,5 +1,5 @@
 import {
-  bindings,
+  bind,
   defineTriggerFunction,
   type InvokeRequest,
   type InvokeResponse,
@@ -22,20 +22,18 @@ export default defineTriggerFunction<
   QueueTriggerResponse
 >({
   name: "queue_trigger",
-  config: {
-    bindings: [
-      bindings.queueTrigger({
-        name: "item",
-        queueName: "test-in",
-        connection: "AzureWebJobsStorage",
-      }),
-      bindings.queueOut({
-        name: "$return",
-        queueName: "test-out",
-        connection: "AzureWebJobsStorage",
-      }),
-    ],
-  },
+  bindings: [
+    bind.storage.queue.trigger({
+      name: "item",
+      queueName: "test-in",
+      connection: "AzureWebJobsStorage",
+    }),
+    bind.storage.queue.output({
+      name: "$return",
+      queueName: "test-out",
+      connection: "AzureWebJobsStorage",
+    }),
+  ],
   handler(payload: InvokeRequest<QueueTriggerData>): QueueTriggerResponse {
     let queueItem = payload.Data.item;
 

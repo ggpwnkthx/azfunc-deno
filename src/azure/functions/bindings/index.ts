@@ -5,140 +5,67 @@
  * JSON Schema (SchemaStore): https://www.schemastore.org/function.json
  */
 
-// Re-export types from individual files
-export type {
-  AuthLevel,
-  BindingBase,
-  CustomBinding,
-  DataTypeHint,
-  Direction,
-  isKnownBindingType,
-  KNOWN_BINDING_TYPES,
-  KnownBindingType,
-} from "./types.ts";
-
-export type { HttpOutputBinding, HttpTriggerBinding } from "./http.ts";
-export { isHttpOutputBinding, isHttpTriggerBinding } from "./http.ts";
-
-export type {
-  BlobInputBinding,
-  BlobOutputBinding,
-  BlobTriggerBinding,
-  isBlobTriggerBinding,
-  isQueueTriggerBinding,
-  QueueOutputBinding,
-  QueueTriggerBinding,
-  TableInputBinding,
-  TableOutputBinding,
-} from "./storage.ts";
-
-export type {
-  ServiceBusOutputBinding,
-  ServiceBusTriggerBinding,
-} from "./service-bus.ts";
-
-export type {
-  EventHubOutputBinding,
-  EventHubTriggerBinding,
-} from "./event-hub.ts";
-
-export type { ManualTriggerBinding, TimerTriggerBinding } from "./timer.ts";
-
-export type {
-  DocumentDBInputBinding,
-  DocumentDBOutputBinding,
-  KustoInputBinding,
-  KustoOutputBinding,
-  MobileTableInputBinding,
-  MobileTableOutputBinding,
-  MySqlInputBinding,
-  MySqlOutputBinding,
-  MySqlTriggerBinding,
-  SqlInputBinding,
-  SqlOutputBinding,
-  SqlTriggerBinding,
-} from "./database.ts";
-
-export type {
-  NotificationHubOutputBinding,
-  SendGridOutputBinding,
-  TwilioSmsOutputBinding,
-} from "./notifications.ts";
+import { isRecord } from "./types.ts";
 
 import type { CustomBinding } from "./types.ts";
 
+import type { HttpBinding } from "./http.ts";
+import type { StorageBinding } from "./storage.ts";
+import type { ServiceBusBinding } from "./service-bus.ts";
+import type { EventHubBinding } from "./event-hub.ts";
+import type { TimerBinding } from "./timer.ts";
+import type { DatabaseBinding } from "./database.ts";
+import type { NotificationBinding } from "./notifications.ts";
+
+/* ----------------------------- Re-exports ----------------------------- */
+
+// types.ts (export generic Binding under a different name to avoid confusion)
+export type {
+  AuthLevel,
+  Binding as BindingDefinition,
+  BindingBase,
+  BindingBuilder,
+  BindingBuilderWithDefaults,
+  BuilderArgs,
+  BuilderArgsWithDefaults,
+  CustomBinding,
+  DataTypeHint,
+  Direction,
+  ExtraOf,
+  KnownBindingType,
+} from "./types.ts";
+
+export {
+  createBindingGuard,
+  defineBinding,
+  defineInBinding,
+  defineInOutBinding,
+  defineOutBinding,
+  isKnownBindingType,
+  isRecord,
+  KNOWN_BINDING_TYPES,
+  makeBindingBuilder,
+} from "./types.ts";
+
+// All binding modules
+export * from "./http.ts";
+export * from "./storage.ts";
+export * from "./service-bus.ts";
+export * from "./event-hub.ts";
+export * from "./timer.ts";
+export * from "./database.ts";
+export * from "./notifications.ts";
+
 /* --------------------------------- Unions -------------------------------- */
 
-import type { HttpOutputBinding, HttpTriggerBinding } from "./http.ts";
-import type {
-  BlobInputBinding,
-  BlobOutputBinding,
-  BlobTriggerBinding,
-  QueueOutputBinding,
-  QueueTriggerBinding,
-  TableInputBinding,
-  TableOutputBinding,
-} from "./storage.ts";
-import type {
-  ServiceBusOutputBinding,
-  ServiceBusTriggerBinding,
-} from "./service-bus.ts";
-import type {
-  EventHubOutputBinding,
-  EventHubTriggerBinding,
-} from "./event-hub.ts";
-import type { ManualTriggerBinding, TimerTriggerBinding } from "./timer.ts";
-import type {
-  DocumentDBInputBinding,
-  DocumentDBOutputBinding,
-  KustoInputBinding,
-  KustoOutputBinding,
-  MobileTableInputBinding,
-  MobileTableOutputBinding,
-  MySqlInputBinding,
-  MySqlOutputBinding,
-  MySqlTriggerBinding,
-  SqlInputBinding,
-  SqlOutputBinding,
-  SqlTriggerBinding,
-} from "./database.ts";
-import type {
-  NotificationHubOutputBinding,
-  SendGridOutputBinding,
-  TwilioSmsOutputBinding,
-} from "./notifications.ts";
-
 export type Binding =
-  | HttpTriggerBinding
-  | HttpOutputBinding
-  | BlobTriggerBinding
-  | BlobInputBinding
-  | BlobOutputBinding
-  | QueueTriggerBinding
-  | QueueOutputBinding
-  | TableInputBinding
-  | TableOutputBinding
-  | ServiceBusTriggerBinding
-  | ServiceBusOutputBinding
-  | EventHubTriggerBinding
-  | EventHubOutputBinding
-  | TimerTriggerBinding
-  | ManualTriggerBinding
-  | MobileTableInputBinding
-  | MobileTableOutputBinding
-  | DocumentDBInputBinding
-  | DocumentDBOutputBinding
-  | NotificationHubOutputBinding
-  | TwilioSmsOutputBinding
-  | SendGridOutputBinding
-  | SqlTriggerBinding
-  | SqlInputBinding
-  | SqlOutputBinding
-  | KustoInputBinding
-  | KustoOutputBinding
-  | MySqlTriggerBinding
-  | MySqlInputBinding
-  | MySqlOutputBinding
+  | HttpBinding
+  | StorageBinding
+  | ServiceBusBinding
+  | EventHubBinding
+  | TimerBinding
+  | DatabaseBinding
+  | NotificationBinding
   | CustomBinding;
 
 export interface RetryPolicy {
@@ -149,19 +76,18 @@ export interface RetryPolicy {
   maximumInterval?: string;
 }
 
-export interface FunctionJson {
-  bindings: Binding[];
+export type FunctionJson = FunctionConfig & { bindings: Binding[] };
+
+export type FunctionConfig = {
   disabled?: boolean;
   excluded?: boolean;
   scriptFile?: string;
   entryPoint?: string;
   configurationSource?: "attributes" | "config";
   retry?: RetryPolicy;
-}
+};
 
 /* ------------------------------ Type guards ------------------------------ */
-
-import { isRecord } from "./guards.ts";
 
 export function isBinding(obj: unknown): obj is Binding {
   if (!isRecord(obj)) return false;
@@ -173,27 +99,3 @@ export function isBinding(obj: unknown): obj is Binding {
     (dir === "in" || dir === "out" || dir === "inout")
   );
 }
-
-/* ------------------------------- Builders -------------------------------- */
-
-import { httpBindings } from "./http.ts";
-import { timerBindings } from "./timer.ts";
-import { storageBindings } from "./storage.ts";
-import { serviceBusBindings } from "./service-bus.ts";
-import { eventHubBindings } from "./event-hub.ts";
-
-export const bindings = {
-  ...httpBindings,
-  ...timerBindings,
-  ...storageBindings,
-  ...serviceBusBindings,
-  ...eventHubBindings,
-
-  /**
-   * Escape hatch for extension bindings (or anything not modeled above).
-   * You still get strong typing for `name/type/direction/dataType`.
-   */
-  custom<T extends CustomBinding>(binding: T): T {
-    return binding;
-  },
-} as const;

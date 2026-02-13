@@ -1,4 +1,5 @@
-import type { BindingBase, DataTypeHint } from "./types.ts";
+import type { BindingFromApi, InBinding, OutBinding } from "./types.ts";
+import { defineInBinding, defineOutBinding } from "./types.ts";
 
 /* -------------------------- Service Bus bindings ------------------------- */
 
@@ -19,100 +20,36 @@ type ServiceBusCommon = {
   accessRights?: "manage" | "listen" | "send";
 };
 
-export type ServiceBusTriggerBinding =
-  & BindingBase
-  & ServiceBusCommon
-  & (ServiceBusQueueLike | ServiceBusTopicLike)
-  & {
-    type: "serviceBusTrigger";
-    direction: "in";
-  };
+export type ServiceBusTriggerBinding = InBinding<
+  "serviceBusTrigger",
+  ServiceBusCommon & (ServiceBusQueueLike | ServiceBusTopicLike)
+>;
 
-export type ServiceBusOutputBinding =
-  & BindingBase
-  & ServiceBusCommon
-  & (ServiceBusQueueLike | ServiceBusTopicLike)
-  & {
-    type: "serviceBus";
-    direction: "out";
-  };
+export type ServiceBusOutputBinding = OutBinding<
+  "serviceBus",
+  ServiceBusCommon & (ServiceBusQueueLike | ServiceBusTopicLike)
+>;
 
-/* ------------------------------- Builders -------------------------------- */
+/* ------------------------------- Grouped API ----------------------------- */
 
-export const serviceBusBindings = {
-  serviceBusTriggerQueue(args: {
-    name: string;
-    queueName: string;
-    connection: string;
-    accessRights?: "manage" | "listen" | "send";
-    dataType?: DataTypeHint;
-  }): ServiceBusTriggerBinding {
-    return {
-      type: "serviceBusTrigger",
-      direction: "in",
-      name: args.name,
-      queueName: args.queueName,
-      connection: args.connection,
-      ...(args.accessRights ? { accessRights: args.accessRights } : {}),
-      ...(args.dataType ? { dataType: args.dataType } : {}),
-    };
+export const serviceBus = {
+  trigger: {
+    queue: defineInBinding<ServiceBusTriggerBinding & ServiceBusQueueLike>(
+      "serviceBusTrigger",
+    ).build,
+    topic: defineInBinding<ServiceBusTriggerBinding & ServiceBusTopicLike>(
+      "serviceBusTrigger",
+    ).build,
   },
 
-  serviceBusTriggerTopic(args: {
-    name: string;
-    topicName: string;
-    subscriptionName: string;
-    connection: string;
-    accessRights?: "manage" | "listen" | "send";
-    dataType?: DataTypeHint;
-  }): ServiceBusTriggerBinding {
-    return {
-      type: "serviceBusTrigger",
-      direction: "in",
-      name: args.name,
-      topicName: args.topicName,
-      subscriptionName: args.subscriptionName,
-      connection: args.connection,
-      ...(args.accessRights ? { accessRights: args.accessRights } : {}),
-      ...(args.dataType ? { dataType: args.dataType } : {}),
-    };
-  },
-
-  serviceBusOutQueue(args: {
-    name: string;
-    queueName: string;
-    connection: string;
-    accessRights?: "manage" | "listen" | "send";
-    dataType?: DataTypeHint;
-  }): ServiceBusOutputBinding {
-    return {
-      type: "serviceBus",
-      direction: "out",
-      name: args.name,
-      queueName: args.queueName,
-      connection: args.connection,
-      ...(args.accessRights ? { accessRights: args.accessRights } : {}),
-      ...(args.dataType ? { dataType: args.dataType } : {}),
-    };
-  },
-
-  serviceBusOutTopic(args: {
-    name: string;
-    topicName: string;
-    subscriptionName: string;
-    connection: string;
-    accessRights?: "manage" | "listen" | "send";
-    dataType?: DataTypeHint;
-  }): ServiceBusOutputBinding {
-    return {
-      type: "serviceBus",
-      direction: "out",
-      name: args.name,
-      topicName: args.topicName,
-      subscriptionName: args.subscriptionName,
-      connection: args.connection,
-      ...(args.accessRights ? { accessRights: args.accessRights } : {}),
-      ...(args.dataType ? { dataType: args.dataType } : {}),
-    };
+  output: {
+    queue: defineOutBinding<ServiceBusOutputBinding & ServiceBusQueueLike>(
+      "serviceBus",
+    ).build,
+    topic: defineOutBinding<ServiceBusOutputBinding & ServiceBusTopicLike>(
+      "serviceBus",
+    ).build,
   },
 } as const;
+
+export type ServiceBusBinding = BindingFromApi<typeof serviceBus>;

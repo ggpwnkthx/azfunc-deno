@@ -1,5 +1,5 @@
 import {
-  bindings,
+  bind,
   defineTriggerFunction,
   type InvokeRequest,
   type InvokeResponse,
@@ -23,20 +23,18 @@ export default defineTriggerFunction<
   BlobTriggerResponse
 >({
   name: "blob_trigger",
-  config: {
-    bindings: [
-      bindings.blobTrigger({
-        name: "myBlob",
-        path: "blobs/{name}",
-        connection: "AzureWebJobsStorage",
-      }),
-      bindings.blobOut({
-        name: "outputBlob",
-        path: "blobs-out/{name}",
-        connection: "AzureWebJobsStorage",
-      }),
-    ],
-  },
+  bindings: [
+    bind.storage.blob.trigger({
+      name: "myBlob",
+      path: "blobs/{name}",
+      connection: "AzureWebJobsStorage",
+    }),
+    bind.storage.blob.output({
+      name: "outputBlob",
+      path: "blobs-out/{name}",
+      connection: "AzureWebJobsStorage",
+    }),
+  ],
   handler(
     payload: InvokeRequest<BlobTriggerData, BlobTriggerMetadata>,
   ): BlobTriggerResponse {

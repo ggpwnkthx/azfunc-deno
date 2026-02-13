@@ -1,159 +1,74 @@
-import type { BindingBase, DataTypeHint } from "./types.ts";
-import { isRecord } from "./guards.ts";
+import type { BindingFromApi, InBinding, OutBinding } from "./types.ts";
+import { defineInBinding, defineOutBinding } from "./types.ts";
 
-/* ---------------------------- Storage bindings --------------------------- */
-
-export interface BlobTriggerBinding extends BindingBase {
-  type: "blobTrigger";
-  direction: "in";
+export type BlobTriggerBinding = InBinding<"blobTrigger", {
   path: string;
   connection: string;
-}
+}>;
 
-export interface BlobInputBinding extends BindingBase {
-  type: "blob";
-  direction: "in";
+export type BlobInputBinding = InBinding<"blob", {
   path: string;
   connection: string;
-}
+}>;
 
-export interface BlobOutputBinding extends BindingBase {
-  type: "blob";
-  direction: "out";
+export type BlobOutputBinding = OutBinding<"blob", {
   path: string;
   connection: string;
-}
+}>;
 
-export interface QueueTriggerBinding extends BindingBase {
-  type: "queueTrigger";
-  direction: "in";
+export type QueueTriggerBinding = InBinding<"queueTrigger", {
   queueName: string;
   connection: string;
-}
+}>;
 
-export interface QueueOutputBinding extends BindingBase {
-  type: "queue";
-  direction: "out";
+export type QueueOutputBinding = OutBinding<"queue", {
   queueName: string;
   connection: string;
-}
+}>;
 
-export interface TableInputBinding extends BindingBase {
-  type: "table";
-  direction: "in";
+export type TableInputBinding = InBinding<"table", {
   tableName: string;
   partitionKey?: string;
   rowKey?: string;
   connection: string;
   take?: string;
   filter?: string;
-}
+}>;
 
-export interface TableOutputBinding extends BindingBase {
-  type: "table";
-  direction: "out";
+export type TableOutputBinding = OutBinding<"table", {
   tableName: string;
   partitionKey?: string;
   rowKey?: string;
   connection: string;
-}
+}>;
 
-/* ------------------------------ Type guards ------------------------------ */
+const blobTrigger = defineInBinding<BlobTriggerBinding>("blobTrigger");
+const blobInput = defineInBinding<BlobInputBinding>("blob");
+const blobOutput = defineOutBinding<BlobOutputBinding>("blob");
 
-export function isBlobTriggerBinding(obj: unknown): obj is BlobTriggerBinding {
-  if (!isRecord(obj)) return false;
-  const b = obj as Record<string, unknown>;
-  return b.type === "blobTrigger" && b.direction === "in";
-}
+const queueTrigger = defineInBinding<QueueTriggerBinding>("queueTrigger");
+const queueOutput = defineOutBinding<QueueOutputBinding>("queue");
 
-export function isQueueTriggerBinding(
-  obj: unknown,
-): obj is QueueTriggerBinding {
-  if (!isRecord(obj)) return false;
-  const b = obj as Record<string, unknown>;
-  return b.type === "queueTrigger" && b.direction === "in";
-}
+const tableInput = defineInBinding<TableInputBinding>("table");
+const tableOutput = defineOutBinding<TableOutputBinding>("table");
 
-/* ------------------------------- Builders -------------------------------- */
+export const isBlobTriggerBinding = blobTrigger.is;
+export const isQueueTriggerBinding = queueTrigger.is;
 
-export const storageBindings = {
-  blobTrigger(args: {
-    name: string;
-    path: string;
-    connection: string;
-    dataType?: DataTypeHint;
-  }): BlobTriggerBinding {
-    return {
-      type: "blobTrigger",
-      direction: "in",
-      name: args.name,
-      path: args.path,
-      connection: args.connection,
-      ...(args.dataType ? { dataType: args.dataType } : {}),
-    };
+export const storage = {
+  blob: {
+    trigger: blobTrigger.build,
+    input: blobInput.build,
+    output: blobOutput.build,
   },
-
-  blobIn(args: {
-    name: string;
-    path: string;
-    connection: string;
-    dataType?: DataTypeHint;
-  }): BlobInputBinding {
-    return {
-      type: "blob",
-      direction: "in",
-      name: args.name,
-      path: args.path,
-      connection: args.connection,
-      ...(args.dataType ? { dataType: args.dataType } : {}),
-    };
+  queue: {
+    trigger: queueTrigger.build,
+    output: queueOutput.build,
   },
-
-  blobOut(args: {
-    name: string;
-    path: string;
-    connection: string;
-    dataType?: DataTypeHint;
-  }): BlobOutputBinding {
-    return {
-      type: "blob",
-      direction: "out",
-      name: args.name,
-      path: args.path,
-      connection: args.connection,
-      ...(args.dataType ? { dataType: args.dataType } : {}),
-    };
-  },
-
-  queueTrigger(args: {
-    name: string;
-    queueName: string;
-    connection: string;
-    dataType?: DataTypeHint;
-  }): QueueTriggerBinding {
-    return {
-      type: "queueTrigger",
-      direction: "in",
-      name: args.name,
-      queueName: args.queueName,
-      connection: args.connection,
-      ...(args.dataType ? { dataType: args.dataType } : {}),
-    };
-  },
-
-  queueOut(args: {
-    name: string; // "$return" allowed
-    queueName: string;
-    connection: string;
-    dataType?: DataTypeHint;
-  }): QueueOutputBinding {
-    return {
-      type: "queue",
-      direction: "out",
-      name: args.name,
-      queueName: args.queueName,
-      connection: args.connection,
-      ...(args.dataType ? { dataType: args.dataType } : {}),
-    };
+  table: {
+    input: tableInput.build,
+    output: tableOutput.build,
   },
 } as const;
+
+export type StorageBinding = BindingFromApi<typeof storage>;

@@ -1,6 +1,6 @@
 // Runtime surface area: safe to import from function modules.
 
-export * from "./bindings/index.ts";
+export * as bind from "./bindings/index.ts";
 export * from "./define.ts";
 
 // App / routing

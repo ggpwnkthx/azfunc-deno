@@ -13,7 +13,7 @@ export type JsonObject = { [k: string]: JsonValue };
  * Azure Functions Custom Handler request payload.
  */
 export interface InvokeRequest<
-  TData extends Record<string, JsonValue> = Record<string, JsonValue>,
+  TData extends object = Record<string, JsonValue>,
   TMetadata extends Record<string, JsonValue> = Record<string, JsonValue>,
 > {
   Data: TData;
@@ -24,7 +24,7 @@ export interface InvokeRequest<
  * Azure Functions Custom Handler response payload.
  */
 export interface InvokeResponse<
-  TOutputs extends Record<string, JsonValue> = Record<string, JsonValue>,
+  TOutputs extends object = Record<string, JsonValue>,
   TReturnValue extends JsonValue = JsonValue,
 > {
   Outputs?: TOutputs;

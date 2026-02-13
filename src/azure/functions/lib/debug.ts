@@ -1,29 +1,53 @@
-import type { AppContext, HttpContext } from "../mod.ts";
+import type { AppContext, TriggerContext } from "../mod.ts";
+import type { AzureHttpRequestData } from "../invoke.ts";
+
+const MB = 1024 * 1024;
+const toMB = (n: number) => `${(n / MB).toFixed(2)} MB`;
+
+function tryCall<T>(fn: () => T): T | null {
+  try {
+    return fn();
+  } catch {
+    return null;
+  }
+}
+
+const REDACT_ENV_KEY_RE = /(SECRET|KEY|TOKEN|PASSWORD)/i;
+
+function safeEnvObject(): Record<string, string> | null {
+  const env = tryCall(() => Deno.env.toObject());
+  if (!env) return null;
+
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (!REDACT_ENV_KEY_RE.test(k)) out[k] = v;
+  }
+  return out;
+}
 
 /**
  * Compiles system diagnostics data.
- * @param appCtx The app context to get function list
- * @param request The incoming request
- * @param ctx The HTTP context
  */
 export function compileDiagnostics(
   appCtx: AppContext,
-  request: Request,
-  ctx: HttpContext,
+  request: AzureHttpRequestData,
+  ctx: TriggerContext,
 ): object {
-  const startTime = Date.now();
+  const genStartMs = Date.now();
+  const nowIso = new Date().toISOString();
 
   const memUsage = Deno.memoryUsage();
-  const sysMem = Deno.systemMemoryInfo();
+  const sysMem = tryCall(() => Deno.systemMemoryInfo());
+  const netIfaces = tryCall(() => Deno.networkInterfaces()) ?? [];
 
   const functions = appCtx.app.list();
 
   return {
     metadata: {
-      timestamp: new Date().toISOString(),
-      generatedAt: new Date().toISOString(),
+      timestamp: nowIso,
+      generatedAt: nowIso,
       azfuncDeno: true,
-      url: request.url,
+      url: request.Url,
     },
     runtime: {
       deno: {
@@ -38,16 +62,15 @@ export function compileDiagnostics(
     },
     process: {
       pid: Deno.pid,
-      uid: Deno.uid(),
-      gid: Deno.gid(),
+      uid: tryCall(() => Deno.uid()),
+      gid: tryCall(() => Deno.gid()),
       executablePath: Deno.execPath(),
       mainModule: Deno.mainModule,
       args: Deno.args,
     },
     uptime: {
       systemUptime: Deno.osUptime(),
-      startTime: new Date(Date.now() - Deno.osUptime() * 1000)
-        .toISOString(),
+      startTime: new Date(Date.now() - Deno.osUptime() * 1000).toISOString(),
     },
     memory: {
       heapTotal: memUsage.heapTotal,
@@ -55,10 +78,10 @@ export function compileDiagnostics(
       external: memUsage.external,
       rss: memUsage.rss,
       formatted: {
-        heapTotal: `${(memUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`,
-        heapUsed: `${(memUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
-        external: `${(memUsage.external / 1024 / 1024).toFixed(2)} MB`,
-        rss: `${(memUsage.rss / 1024 / 1024).toFixed(2)} MB`,
+        heapTotal: toMB(memUsage.heapTotal),
+        heapUsed: toMB(memUsage.heapUsed),
+        external: toMB(memUsage.external),
+        rss: toMB(memUsage.rss),
       },
     },
     systemMemory: sysMem
@@ -66,27 +89,20 @@ export function compileDiagnostics(
         free: sysMem.free,
         available: sysMem.available,
         total: sysMem.total,
-        usedPercent: ((1 - sysMem.free / sysMem.total) * 100).toFixed(
-          2,
-        ),
-        freeFormatted: `${(sysMem.free / 1024 / 1024).toFixed(2)} MB`,
-        availableFormatted: `${(sysMem.available / 1024 / 1024).toFixed(2)} MB`,
-        totalFormatted: `${(sysMem.total / 1024 / 1024).toFixed(2)} MB`,
+        usedPercent: ((1 - sysMem.free / sysMem.total) * 100).toFixed(2),
+        freeFormatted: toMB(sysMem.free),
+        availableFormatted: toMB(sysMem.available),
+        totalFormatted: toMB(sysMem.total),
       }
       : null,
     cpu: {
       cores: navigator.hardwareConcurrency ?? "unknown",
     },
     network: {
-      interfaces: Deno.networkInterfaces(),
-      addrCount: Deno.networkInterfaces().length,
+      interfaces: netIfaces,
+      addrCount: netIfaces.length,
     },
-    env: Object.fromEntries(
-      Object.entries(Deno.env.toObject()).filter(([k]) =>
-        !k.includes("SECRET") && !k.includes("KEY") &&
-        !k.includes("PASSWORD")
-      ),
-    ),
+    env: safeEnvObject(),
     function: {
       name: ctx.functionDir,
       routePrefix: ctx.routePrefix,
@@ -94,85 +110,100 @@ export function compileDiagnostics(
       params: ctx.params,
     },
     request: {
-      url: request.url,
-      method: request.method,
-      headers: Object.fromEntries(request.headers.entries()),
-      contentLength: request.headers.get("content-length"),
-      contentType: request.headers.get("content-type"),
-      referrer: request.referrer,
-      credentials: request.credentials,
-      mode: request.mode,
+      url: request.Url,
+      method: request.Method,
+      headers: request.Headers,
+      query: request.Query,
+      params: request.Params,
     },
     azureFunctions: {
-      version: Deno.env.get("FUNCTIONS_EXTENSION_VERSION") ?? "unknown",
-      appName: Deno.env.get("WEBSITE_SITE_NAME") ?? "unknown",
-      subscriptionId: Deno.env.get("WEBSITE_SubscriptionId") ??
+      version: tryCall(() => Deno.env.get("FUNCTIONS_EXTENSION_VERSION")) ??
         "unknown",
-      runtime: Deno.env.get("FUNCTIONS_WORKER_RUNTIME") ?? "deno",
+      appName: tryCall(() => Deno.env.get("WEBSITE_SITE_NAME")) ?? "unknown",
+      subscriptionId: tryCall(() => Deno.env.get("WEBSITE_SubscriptionId")) ??
+        "unknown",
+      runtime: tryCall(() => Deno.env.get("FUNCTIONS_WORKER_RUNTIME")) ??
+        "deno",
       platform: {
-        platformVersion: Deno.env.get("WEBSITE_PLATFORM_VERSION") ??
+        platformVersion:
+          tryCall(() => Deno.env.get("WEBSITE_PLATFORM_VERSION")) ?? null,
+        sku: tryCall(() => Deno.env.get("WEBSITE_SKU")) ?? null,
+        bitness: tryCall(() => Deno.env.get("SITE_BITNESS")) ?? null,
+        computeMode: tryCall(() => Deno.env.get("WEBSITE_COMPUTE_MODE")) ??
           null,
-        sku: Deno.env.get("WEBSITE_SKU") ?? null,
-        bitness: Deno.env.get("SITE_BITNESS") ?? null,
-        computeMode: Deno.env.get("WEBSITE_COMPUTE_MODE") ?? null,
-        volumeType: Deno.env.get("WEBSITE_VOLUME_TYPE") ?? null,
+        volumeType: tryCall(() => Deno.env.get("WEBSITE_VOLUME_TYPE")) ?? null,
       },
       instance: {
-        instanceId: Deno.env.get("WEBSITE_INSTANCE_ID") ?? "unknown",
-        roleInstanceId: Deno.env.get("WEBSITE_ROLE_INSTANCE_ID") ?? null,
-        workerId: Deno.env.get("WEBSITES_ROLE_WORKER_ID") ?? "unknown",
-        containerName: Deno.env.get("CONTAINER_NAME") ?? null,
-        hostname: Deno.env.get("WEBSITE_HOSTNAME") ?? "unknown",
-        privateIp: Deno.env.get("WEBSITE_PRIVATE_IP") ?? null,
+        instanceId: tryCall(() => Deno.env.get("WEBSITE_INSTANCE_ID")) ??
+          "unknown",
+        roleInstanceId:
+          tryCall(() => Deno.env.get("WEBSITE_ROLE_INSTANCE_ID")) ?? null,
+        workerId: tryCall(() => Deno.env.get("WEBSITES_ROLE_WORKER_ID")) ??
+          "unknown",
+        containerName: tryCall(() => Deno.env.get("CONTAINER_NAME")) ?? null,
+        hostname: tryCall(() => Deno.env.get("WEBSITE_HOSTNAME")) ?? "unknown",
+        privateIp: tryCall(() => Deno.env.get("WEBSITE_PRIVATE_IP")) ?? null,
       },
       region: {
-        name: Deno.env.get("REGION_NAME") ??
-          Deno.env.get("WEBSITE_REGION") ?? "unknown",
+        name: tryCall(() => Deno.env.get("REGION_NAME")) ??
+          tryCall(() => Deno.env.get("WEBSITE_REGION")) ?? "unknown",
       },
       resource: {
-        resourceGroup: Deno.env.get("WEBSITE_RESOURCE_GROUP") ?? null,
-        slotName: Deno.env.get("WEBSITE_SLOT_NAME") ?? null,
-        deploymentId: Deno.env.get("WEBSITE_DEPLOYMENT_ID") ?? null,
+        resourceGroup: tryCall(() => Deno.env.get("WEBSITE_RESOURCE_GROUP")) ??
+          null,
+        slotName: tryCall(() => Deno.env.get("WEBSITE_SLOT_NAME")) ?? null,
+        deploymentId: tryCall(() => Deno.env.get("WEBSITE_DEPLOYMENT_ID")) ??
+          null,
       },
       environment: {
-        environment: Deno.env.get("AZURE_FUNCTIONS_ENVIRONMENT") ??
-          "unknown",
-        requestId: Deno.env.get("FUNCTIONS_REQUEST_ID") ?? null,
-        dnsServer: Deno.env.get("WEBSITE_DNS_SERVER") ?? null,
+        environment:
+          tryCall(() => Deno.env.get("AZURE_FUNCTIONS_ENVIRONMENT")) ??
+            "unknown",
+        requestId: tryCall(() => Deno.env.get("FUNCTIONS_REQUEST_ID")) ?? null,
+        dnsServer: tryCall(() => Deno.env.get("WEBSITE_DNS_SERVER")) ?? null,
       },
       storage: {
-        contentShare: Deno.env.get("WEBSITE_CONTENTSHARE") ?? null,
-        runFromPackage: Deno.env.get("WEBSITE_RUN_FROM_PACKAGE") ?? null,
-        webJobsStorageConfigured: !!Deno.env.get("AzureWebJobsStorage"),
-        webJobsStorage: Deno.env.get("AzureWebJobsStorage")
+        contentShare: tryCall(() => Deno.env.get("WEBSITE_CONTENTSHARE")) ??
+          null,
+        runFromPackage:
+          tryCall(() => Deno.env.get("WEBSITE_RUN_FROM_PACKAGE")) ?? null,
+        webJobsStorageConfigured: !!tryCall(() =>
+          Deno.env.get("AzureWebJobsStorage")
+        ),
+        webJobsStorage: tryCall(() => Deno.env.get("AzureWebJobsStorage"))
           ? "[REDACTED]"
           : "not configured",
-        featureFlags: Deno.env.get("AzureWebJobsFeatureFlags") ?? "none",
+        featureFlags: tryCall(() => Deno.env.get("AzureWebJobsFeatureFlags")) ??
+          "none",
       },
       scaling: {
-        workerProcessCount: Deno.env.get("FUNCTIONS_WORKER_PROCESS_COUNT") ??
-          null,
-        maxScaleOut: Deno.env.get(
-          "WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT",
-        ) ?? null,
-        coldStartEnabled: Deno.env.get("WEBSITE_USE_PLACEHOLDER") ?? null,
+        workerProcessCount:
+          tryCall(() => Deno.env.get("FUNCTIONS_WORKER_PROCESS_COUNT")) ?? null,
+        maxScaleOut:
+          tryCall(() =>
+            Deno.env.get("WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT")
+          ) ?? null,
+        coldStartEnabled:
+          tryCall(() => Deno.env.get("WEBSITE_USE_PLACEHOLDER")) ?? null,
       },
       managedIdentity: {
-        endpoint: Deno.env.get("IDENTITY_ENDPOINT") ?? null,
-        headerConfigured: !!Deno.env.get("IDENTITY_HEADER"),
+        endpoint: tryCall(() => Deno.env.get("IDENTITY_ENDPOINT")) ?? null,
+        headerConfigured: !!tryCall(() => Deno.env.get("IDENTITY_HEADER")),
       },
       healthCheck: {
-        warmupPath: Deno.env.get("WEBSITE_WARMUP_PATH") ?? null,
-        maxPingFailures: Deno.env.get(
-          "WEBSITE_HEALTHCHECK_MAXPINGFAILURES",
-        ) ?? null,
-        maxUnhealthyPercent: Deno.env.get(
-          "WEBSITE_HEALTHCHECK_MAXUNHEALTHYWORKERPERCENT",
-        ) ?? null,
+        warmupPath: tryCall(() => Deno.env.get("WEBSITE_WARMUP_PATH")) ?? null,
+        maxPingFailures:
+          tryCall(() => Deno.env.get("WEBSITE_HEALTHCHECK_MAXPINGFAILURES")) ??
+            null,
+        maxUnhealthyPercent:
+          tryCall(() =>
+            Deno.env.get("WEBSITE_HEALTHCHECK_MAXUNHEALTHYWORKERPERCENT")
+          ) ?? null,
       },
     },
     customHandler: {
-      port: Deno.env.get("FUNCTIONS_CUSTOMHANDLER_PORT") ?? "8080",
+      port: tryCall(() => Deno.env.get("FUNCTIONS_CUSTOMHANDLER_PORT")) ??
+        "8080",
       pid: Deno.pid,
       uptime: Deno.osUptime(),
     },
@@ -181,11 +212,11 @@ export function compileDiagnostics(
       extensionBundleVersion: "[4.0.0, 5.0.0)",
     },
     invocation: {
-      invocationId: request.headers.get("x-azure-functions-invocation-id") ??
-        request.headers.get("invocationid") ?? null,
+      invocationId: request.Headers?.["x-azure-functions-invocation-id"]?.[0] ??
+        request.Headers?.["invocationid"]?.[0] ?? null,
       executionContextId:
-        request.headers.get("x-azure-functions-execution-context-id") ??
-          request.headers.get("executioncontextid") ?? null,
+        request.Headers?.["x-azure-functions-execution-context-id"]?.[0] ??
+          request.Headers?.["executioncontextid"]?.[0] ?? null,
     },
     bindings: {
       input: null,
@@ -196,13 +227,13 @@ export function compileDiagnostics(
       checks: {
         memory: memUsage.rss < 1024 * 1024 * 1024,
         runtime: typeof Deno.version.deno === "string",
-        storageConfigured: !!Deno.env.get("AzureWebJobsStorage"),
+        storageConfigured: !!tryCall(() => Deno.env.get("AzureWebJobsStorage")),
       },
     },
     functions: {
       totalCount: functions.length,
       names: functions.map((fn) => fn.name),
     },
-    diagnosticsGenerationMs: Date.now() - startTime,
+    diagnosticsGenerationMs: Date.now() - genStartMs,
   };
 }
