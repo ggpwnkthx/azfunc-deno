@@ -13,19 +13,28 @@ export type FunctionKind = "trigger";
 
 /**
  * App-level context passed to handlers.
- * Provides read-only access to the registered app instance (or function list).
+ * @deprecated Use `Context` instead - it combines both AppContext and TriggerContext.
  */
 export interface AppContext {
   readonly app: Readonly<Pick<AzureFunctionsApp, "list">>;
 }
 
+/**
+ * Trigger-level context passed to handlers.
+ * @deprecated Use `Context` instead - it combines both AppContext and TriggerContext.
+ */
 export interface TriggerContext {
-  functionDir: string;
-  rawPathname: string;
-  /** Route prefix (only for HTTP triggers) */
-  routePrefix?: string;
-  /** Route params (only for HTTP triggers) */
-  params?: Record<string, string>;
+  functionName: string;
+}
+
+/**
+ * Unified context passed to function handlers.
+ * Combines both trigger-level info and app-level access.
+ */
+export interface Context {
+  functionName: string;
+  /** Read-only access to the app's registered functions */
+  readonly app: Readonly<Pick<AzureFunctionsApp, "list">>;
 }
 
 export type TriggerHandlerResult = InvokeResponse | Response;
@@ -33,15 +42,14 @@ export type MaybePromise<T> = T | Promise<T>;
 
 /**
  * Public handler type.
- * Users may declare fewer parameters; we always call (payload, ctx, appCtx).
+ * Uses unified `Context` that combines both trigger-level and app-level info.
  */
 export type TriggerHandler<
   TPayload extends { Data: unknown; Metadata?: unknown } = InvokeRequest,
   TResult extends TriggerHandlerResult = InvokeResponse,
 > = (
   payload: TPayload,
-  ctx: TriggerContext,
-  appCtx: AppContext,
+  ctx: Context,
 ) => MaybePromise<
   TResult
 >;
@@ -49,11 +57,11 @@ export type TriggerHandler<
 /**
  * Internal handler signature used by router/registry.
  * Payload typing is erased here to avoid registry invariance.
+ * Uses unified `Context` that combines both trigger-level and app-level info.
  */
 export type TriggerHandlerInternal = (
   payload: InvokeRequest,
-  ctx: TriggerContext,
-  appCtx: AppContext,
+  ctx: Context,
 ) => MaybePromise<TriggerHandlerResult>;
 
 export interface FunctionBindingsIndex {
@@ -163,8 +171,7 @@ export function defineFunction<
         InferInputData<TBindings>,
         InferMetadata<TBindings>
       >,
-      ctx: TriggerContext,
-      appCtx?: AppContext,
+      ctx: Context,
     ) => MaybePromise<InferResult<TBindings>>;
   },
 ): TriggerFunctionDefinition;
@@ -178,8 +185,7 @@ export function defineFunction<
   bindings: TBindings;
   handler: (
     payload: InvokeRequest<InferInputData<TBindings>, InferMetadata<TBindings>>,
-    ctx: TriggerContext,
-    appCtx?: AppContext,
+    ctx: Context,
   ) => MaybePromise<InferResult<TBindings>>;
 }): TriggerFunctionDefinition {
   const dir = normalizeFunctionDir(options.name);
@@ -190,14 +196,13 @@ export function defineFunction<
 
   const bindings = indexBindings(options.bindings);
 
-  const internalHandler: TriggerHandlerInternal = (payload, ctx, appCtx) =>
+  const internalHandler: TriggerHandlerInternal = (payload, ctx) =>
     options.handler(
       payload as InvokeRequest<
         InferInputData<TBindings>,
         InferMetadata<TBindings>
       >,
       ctx,
-      appCtx,
     ) as MaybePromise<TriggerHandlerResult>;
 
   return withBindingLookups({

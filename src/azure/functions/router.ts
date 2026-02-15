@@ -1,13 +1,8 @@
 import { join as joinPath } from "@std/path";
-import type {
-  AppContext,
-  FunctionDefinition,
-  TriggerContext,
-} from "./define.ts";
+import type { Context, FunctionDefinition } from "./define.ts";
 import type { AzureFunctionsApp } from "./app.ts";
 import { isHttpTriggerBinding } from "./bindings/index.ts";
 import {
-  asAzureHttpRequestData,
   type InvokeResponse,
   invokeResponseFromHttpResponse,
   parseInvokeRequest,
@@ -31,7 +26,7 @@ const json = (status: number, body: unknown): Response =>
 function createAppContext(
   functions: readonly FunctionDefinition[],
   app?: AzureFunctionsApp,
-): AppContext {
+): Readonly<Pick<Context, "app">> {
   return { app: { list: () => app?.list() ?? functions } };
 }
 
@@ -75,7 +70,6 @@ export function buildAzureFunctionsRouter(
   options: RouterOptions = {},
   app?: AzureFunctionsApp,
 ): AzureFunctionsRouter {
-  const routePrefix = normalizePrefix(options.routePrefix ?? "api");
   const maxInvokeBodyBytes = options.maxInvokeBodyBytes ?? 1024 * 1024;
   const maxHttpResponseBodyBytes = options.maxHttpResponseBodyBytes ??
     4 * 1024 * 1024;
@@ -127,21 +121,9 @@ export function buildAzureFunctionsRouter(
         const raw = await readJsonBodyLimited(req, maxInvokeBodyBytes);
         const invokeReq = parseInvokeRequest(raw);
 
-        const ctx: TriggerContext = isHttp && trigger
-          ? (() => {
-            const httpReqData = asAzureHttpRequestData(
-              invokeReq.Data[trigger.name],
-            );
-            return {
-              functionDir: fn.name,
-              routePrefix,
-              rawPathname: new URL(httpReqData.Url).pathname,
-              params: httpReqData.Params ?? {},
-            };
-          })()
-          : { functionDir: fn.name, rawPathname: url.pathname };
+        const ctx: Context = { functionName: fn.name, ...appCtx };
 
-        const out = await fn.handler(invokeReq, ctx, appCtx);
+        const out = await fn.handler(invokeReq, ctx);
 
         if (out instanceof Response) {
           if (!isHttp) {

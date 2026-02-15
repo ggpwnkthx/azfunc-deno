@@ -12,7 +12,8 @@ export default defineFunction({
   ],
   handler(payload, ctx) {
     const req = payload.Data.req;
-    const routeRaw = ctx.params?.route ?? "";
+    const params = req.Params ?? {};
+    const routeRaw = params.route ?? "";
     const route = "/" + routeRaw.replace(/^\/+/, "");
 
     if (route === "/diagnostics" || routeRaw === "diagnostics") {
@@ -24,10 +25,8 @@ export default defineFunction({
       deno: { version: Deno.version.deno },
       request: { url: req.Url, method: req.Method },
       matched: {
-        function: ctx.functionDir,
-        routePrefix: ctx.routePrefix,
-        rawPathname: ctx.rawPathname,
-        params: ctx.params,
+        function: ctx.functionName,
+        params: params,
       },
     };
 

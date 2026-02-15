@@ -1,5 +1,6 @@
-import type { AppContext, TriggerContext } from "../mod.ts";
+import type { Context } from "../define.ts";
 import type { AzureHttpRequestData } from "../invoke.ts";
+import type { FunctionDefinition } from "../define.ts";
 
 const MB = 1024 * 1024;
 const toMB = (n: number) => `${(n / MB).toFixed(2)} MB`;
@@ -29,9 +30,8 @@ function safeEnvObject(): Record<string, string> | null {
  * Compiles system diagnostics data.
  */
 export function compileDiagnostics(
-  appCtx: AppContext,
   request: AzureHttpRequestData,
-  ctx: TriggerContext,
+  ctx: Context,
 ): object {
   const genStartMs = Date.now();
   const nowIso = new Date().toISOString();
@@ -40,7 +40,7 @@ export function compileDiagnostics(
   const sysMem = tryCall(() => Deno.systemMemoryInfo());
   const netIfaces = tryCall(() => Deno.networkInterfaces()) ?? [];
 
-  const functions = appCtx.app.list();
+  const functions = ctx.app.list();
 
   return {
     metadata: {
@@ -104,10 +104,7 @@ export function compileDiagnostics(
     },
     env: safeEnvObject(),
     function: {
-      name: ctx.functionDir,
-      routePrefix: ctx.routePrefix,
-      rawPathname: ctx.rawPathname,
-      params: ctx.params,
+      name: ctx.functionName,
     },
     request: {
       url: request.Url,
@@ -232,7 +229,7 @@ export function compileDiagnostics(
     },
     functions: {
       totalCount: functions.length,
-      names: functions.map((fn) => fn.name),
+      names: functions.map((fn: FunctionDefinition) => fn.name),
     },
     diagnosticsGenerationMs: Date.now() - genStartMs,
   };
