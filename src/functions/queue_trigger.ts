@@ -1,26 +1,15 @@
 import {
   bind,
-  defineTriggerFunction,
-  type InvokeRequest,
-  type InvokeResponse,
+  defineFunction,
   type JsonValue,
   tryParseJson,
 } from "@azure/functions";
-
-type QueueTriggerData = {
-  item: JsonValue;
-};
-
-type QueueTriggerResponse = InvokeResponse<Record<string, never>, string>;
 
 function toQueueMessage(value: JsonValue): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
-export default defineTriggerFunction<
-  InvokeRequest<QueueTriggerData>,
-  QueueTriggerResponse
->({
+export default defineFunction({
   name: "queue_trigger",
   bindings: [
     bind.storage.queue.trigger({
@@ -34,7 +23,7 @@ export default defineTriggerFunction<
       connection: "AzureWebJobsStorage",
     }),
   ],
-  handler(payload: InvokeRequest<QueueTriggerData>): QueueTriggerResponse {
+  handler(payload) {
     let queueItem = payload.Data.item;
 
     // Normalize input: Azure Functions may JSON-encode queue items as strings

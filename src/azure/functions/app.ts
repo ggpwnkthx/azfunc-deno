@@ -6,7 +6,6 @@ import {
   resolveRoutePrefixFromEnv,
   resolveRoutePrefixFromHostJson,
 } from "./router.ts";
-import type { GenerateOptions, WrittenFile } from "./generator.ts";
 import { writeFunctionJsonFiles } from "./generator.ts";
 
 /**
@@ -93,15 +92,6 @@ export class AzureFunctionsApp {
   }
 
   /**
-   * Write each registered function's `function.json`.
-   */
-  async writeFunctionJsonFiles(
-    options: GenerateOptions = {},
-  ): Promise<WrittenFile[]> {
-    return await writeFunctionJsonFiles(this.list(), options);
-  }
-
-  /**
    * CLI/runtime entrypoint owned by the app.
    *
    * Behavior:
@@ -121,7 +111,7 @@ export class AzureFunctionsApp {
       const ensureDirs = options.ensureDirs ?? true;
       const validateDirs = options.validateDirs ?? true;
 
-      const written = await this.writeFunctionJsonFiles({
+      const written = await writeFunctionJsonFiles(this.list(), {
         rootDir,
         ensureDirs,
         validateDirs,

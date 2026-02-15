@@ -3,6 +3,15 @@
 export * as bind from "./bindings/index.ts";
 export * from "./define.ts";
 
+// Type helpers for manual validation
+export type {
+  AssertSingleTrigger,
+  ExtractTrigger,
+  InputBindingNames,
+  OutputBindingNames,
+  TriggerCount,
+} from "./bindings/index.ts";
+
 // App / routing
 export { AzureFunctionsApp } from "./app.ts";
 export type { AzureFunctionsRouter, RouterOptions } from "./router.ts";

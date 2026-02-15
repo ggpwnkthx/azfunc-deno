@@ -21,18 +21,27 @@ import type { NotificationBinding } from "./notifications.ts";
 
 // types.ts (export generic Binding under a different name to avoid confusion)
 export type {
+  AssertSingleTrigger,
   AuthLevel,
   Binding as BindingDefinition,
   BindingBase,
   BindingBuilder,
   BindingBuilderWithDefaults,
+  BindingNames,
   BuilderArgs,
   BuilderArgsWithDefaults,
+  BuildResponseOutputs,
   CustomBinding,
   DataTypeHint,
   Direction,
+  ExtractTrigger,
   ExtraOf,
+  InputBindingNames,
+  InputBindingsMap,
   KnownBindingType,
+  OutputBindingNames,
+  OutputBindingsMap,
+  TriggerCount,
 } from "./types.ts";
 
 export {

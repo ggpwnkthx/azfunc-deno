@@ -1,5 +1,10 @@
 import type { AzureFunctionsApp } from "./app.ts";
 import type { Binding, FunctionConfig } from "./bindings/index.ts";
+import type {
+  InferInputData,
+  InferMetadata,
+  InferResult,
+} from "./bindings/types.ts";
 import type { InvokeRequest, InvokeResponse } from "./invoke.ts";
 import { AppError } from "./lib/errors.ts";
 import { normalizeFunctionDir } from "./lib/path.ts";
@@ -141,18 +146,41 @@ function withBindingLookups<T extends { bindings: FunctionBindingsIndex }>(
 /**
  * Generic trigger constructor (abstract over trigger types).
  *
- * NOTE:
- * - The returned FunctionDefinition erases the specific payload type for registry compatibility.
- * - You still get strong typing inside your handler via the generic parameters.
+ * Uses rest parameters to infer handler types automatically from bindings.
+ * No `as const` or explicit type annotations needed.
  */
-export function defineTriggerFunction<
-  TPayload extends { Data: unknown; Metadata?: unknown } = InvokeRequest,
-  TResult extends TriggerHandlerResult = InvokeResponse,
+
+// Main overload: infer handler types from bindings using rest parameters
+export function defineFunction<
+  const TBindings extends readonly [...Binding[]],
+>(
+  options: {
+    name: string;
+    config?: FunctionConfig;
+    bindings: TBindings;
+    handler: (
+      payload: InvokeRequest<
+        InferInputData<TBindings>,
+        InferMetadata<TBindings>
+      >,
+      ctx: TriggerContext,
+      appCtx?: AppContext,
+    ) => MaybePromise<InferResult<TBindings>>;
+  },
+): TriggerFunctionDefinition;
+
+// Implementation
+export function defineFunction<
+  TBindings extends readonly [...Binding[]],
 >(options: {
   name: string;
   config?: FunctionConfig;
-  bindings: readonly Binding[];
-  handler: TriggerHandler<TPayload, TResult>;
+  bindings: TBindings;
+  handler: (
+    payload: InvokeRequest<InferInputData<TBindings>, InferMetadata<TBindings>>,
+    ctx: TriggerContext,
+    appCtx?: AppContext,
+  ) => MaybePromise<InferResult<TBindings>>;
 }): TriggerFunctionDefinition {
   const dir = normalizeFunctionDir(options.name);
 
@@ -164,12 +192,13 @@ export function defineTriggerFunction<
 
   const internalHandler: TriggerHandlerInternal = (payload, ctx, appCtx) =>
     options.handler(
-      payload as unknown as TPayload,
+      payload as InvokeRequest<
+        InferInputData<TBindings>,
+        InferMetadata<TBindings>
+      >,
       ctx,
       appCtx,
-    ) as MaybePromise<
-      TriggerHandlerResult
-    >;
+    ) as MaybePromise<TriggerHandlerResult>;
 
   return withBindingLookups({
     name: dir,
@@ -179,6 +208,3 @@ export function defineTriggerFunction<
     bindings,
   });
 }
-
-/** Convenience alias */
-export const defineFunction = defineTriggerFunction;

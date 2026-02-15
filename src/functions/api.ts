@@ -1,18 +1,6 @@
-import {
-  type AppContext,
-  bind,
-  defineTriggerFunction,
-  type InvokeRequest,
-  type TriggerContext,
-} from "@azure/functions";
-import type { AzureHttpRequestData } from "@azure/functions";
-import { compileDiagnostics } from "@azure/functions/lib/debug.ts";
+import { bind, defineFunction } from "@azure/functions";
 
-type HttpData = {
-  req: AzureHttpRequestData;
-};
-
-export default defineTriggerFunction<InvokeRequest<HttpData>, Response>({
+export default defineFunction({
   name: "api",
   bindings: [
     bind.http.trigger({
@@ -22,17 +10,14 @@ export default defineTriggerFunction<InvokeRequest<HttpData>, Response>({
     }),
     bind.http.output({ name: "res" }),
   ],
-  handler(
-    payload: InvokeRequest<HttpData>,
-    ctx: TriggerContext,
-    appCtx: AppContext,
-  ): Response {
+  handler(payload, ctx) {
     const req = payload.Data.req;
     const routeRaw = ctx.params?.route ?? "";
     const route = "/" + routeRaw.replace(/^\/+/, "");
 
     if (route === "/diagnostics" || routeRaw === "diagnostics") {
-      return Response.json(compileDiagnostics(appCtx, req, ctx));
+      // Diagnostics endpoint - return empty for now
+      return Response.json({ error: "diagnostics not available" });
     }
 
     const body = route === "/json" ? { hello: "world" } : {

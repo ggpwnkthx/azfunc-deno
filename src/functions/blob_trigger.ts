@@ -1,27 +1,6 @@
-import {
-  bind,
-  defineTriggerFunction,
-  type InvokeRequest,
-  type InvokeResponse,
-  type JsonValue,
-} from "@azure/functions";
+import { bind, defineFunction } from "@azure/functions";
 
-type BlobTriggerData = {
-  myBlob: JsonValue;
-};
-
-type BlobTriggerMetadata = {
-  blobTrigger?: string;
-};
-
-type BlobTriggerResponse = InvokeResponse<{
-  outputBlob: JsonValue;
-}>;
-
-export default defineTriggerFunction<
-  InvokeRequest<BlobTriggerData, BlobTriggerMetadata>,
-  BlobTriggerResponse
->({
+export default defineFunction({
   name: "blob_trigger",
   bindings: [
     bind.storage.blob.trigger({
@@ -35,12 +14,12 @@ export default defineTriggerFunction<
       connection: "AzureWebJobsStorage",
     }),
   ],
-  handler(
-    payload: InvokeRequest<BlobTriggerData, BlobTriggerMetadata>,
-  ): BlobTriggerResponse {
+  handler(payload) {
     const blobContent = payload.Data.myBlob;
 
-    const blobName = payload.Metadata.blobTrigger?.split("/").pop()?.trim() ||
+    const blobName =
+      (payload.Metadata.blobTrigger as string | undefined)?.split("/").pop()
+        ?.trim() ||
       "unknown";
 
     return {

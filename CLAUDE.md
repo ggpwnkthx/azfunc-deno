@@ -5,82 +5,97 @@ code in this repository.
 
 ## Project Overview
 
-**azfunc-deno** is a Deno-based Azure Functions runtime using Custom Handlers.
-It provides a type-safe, registration-based approach for defining Azure
-Functions with Deno.
+Azure Functions runtime for Deno. Uses Azure's Custom Handler protocol to run
+Deno functions on Azure Functions.
 
 ## Commands
 
 ```bash
-# Generate function.json files (required before running/deploying)
-deno task gen
-
-# Development with hot reload
-deno task dev
-
-# Build standalone binary
-deno task build
-
-# Deploy to Azure
-deno task publish
+deno task dev      # Generate function.json and run in watch mode
+deno task build    # Generate function.json and compile to binary
+deno task publish  # Build and deploy to Azure Function App
+deno task gen      # Only generate function.json files
+deno fmt           # Format code
+deno lint          # Lint code
+deno check         # Type-check
 ```
 
 ## Architecture
 
-### Registration-Based Design
+### Function Definition
 
-Functions are explicitly registered rather than auto-discovered. The workflow:
-
-1. Register functions in `handler.ts` using `app.register()`
-2. Define functions with `defineHttpFunction()` or `defineTriggerFunction()`
-3. Run `deno task gen` to auto-generate `function.json` files for Azure
-
-### Core Entry Points
-
-- **handler.ts**: Main entry point that registers functions and starts the
-  server
-- **src/azure/functions/mod.ts**: Public API (`@azure/functions` namespace)
-- **src/azure/functions/app.ts**: `AzureFunctionsApp` class - registry for all
-  functions
-
-### Key Components
-
-| File           | Purpose                                                                             |
-| -------------- | ----------------------------------------------------------------------------------- |
-| `app.ts`       | Main app class - handles registration, serving, and function.json generation        |
-| `define.ts`    | `defineHttpFunction()` and `defineTriggerFunction()` - function definition builders |
-| `router.ts`    | HTTP router for handling function invocations via custom handler protocol           |
-| `generator.ts` | Generates `function.json` from registered functions                                 |
-| `bindings/`    | Type-safe Azure binding definitions (http, blob, queue, timer, etc.)                |
-
-### Data Flow
-
-1. Azure Functions host sends request to custom handler
-2. `router.ts` parses the custom handler protocol
-3. Matches request to registered function by route/functionId
-4. Invokes handler with typed input
-5. Returns response in custom handler format
-
-### Type Safety Pattern
-
-Bindings are builder functions that enforce types at definition time:
+Functions are defined using `defineFunction()` from `@azure/functions`:
 
 ```typescript
-app.http("myFunc", {
-  methods: ["GET"],
-  route: "users/{id}",
-  handler: (req, context) => { ... }
-})
+import { bind, defineFunction } from "@azure/functions";
+
+export default defineFunction({
+  name: "myFunction",
+  bindings: [
+    bind.http.trigger({ name: "req", route: "api/{*route}" }),
+    bind.http.output({ name: "res" }),
+  ],
+  handler(payload, ctx) {
+    return new Response("Hello");
+  },
+});
 ```
 
-## Dependencies
+### App Registry
 
-- **Deno** - Runtime (no Node.js)
-- **@std/path** - Standard library path utilities
-- Custom `@azure/functions` implementation (local, not npm package)
+Register functions with `AzureFunctionsApp` in `handler.ts`:
 
-## Azure-Specific Files
+```typescript
+import { AzureFunctionsApp } from "@azure/functions";
+import myFunction from "./src/functions/myFunction.ts";
 
-- `host.json`: Azure Functions host configuration
-- `.funcignore`: Files to exclude from deployment
-- `local.settings.json`: Local development secrets (gitignored)
+const app = new AzureFunctionsApp();
+app.register(myFunction);
+
+if (import.meta.main) {
+  await app.serve();
+}
+```
+
+### Binding System
+
+Located in `src/azure/functions/bindings/`. Each binding type has builder
+functions:
+
+- `bind.http` - HTTP trigger and output
+- `bind.storage.blob` - Blob trigger, input, output
+- `bind.storage.queue` - Queue trigger, output
+- `bind.storage.table` - Table input, output
+- `bind.serviceBus` - Service Bus trigger/output
+- `bind.eventHub` - Event Hub trigger/output
+- `bind.timer` - Timer trigger
+- `bind.database` - SQL bindings
+
+### Custom Handler Protocol
+
+The runtime uses Azure's Custom Handler - HTTP POST requests with
+`InvokeRequest` body:
+
+```typescript
+{
+  Data: { triggerBindingName: triggerData },
+  Metadata: { invocationId, ... }
+}
+```
+
+Response uses `InvokeResponse` format with `Outputs` and `ReturnValue`.
+
+### Generator
+
+Run with `--gen` flag to auto-generate `function.json` files from TypeScript
+definitions. Each registered function gets its own directory with
+`function.json` and optionally `readme.md`.
+
+### Key Files
+
+- `handler.ts` - App entry point
+- `src/azure/functions/mod.ts` - Public exports
+- `src/azure/functions/app.ts` - AzureFunctionsApp class
+- `src/azure/functions/define.ts` - defineFunction factory
+- `src/azure/functions/invoke.ts` - InvokeRequest/InvokeResponse types
+- `src/azure/functions/router.ts` - Request routing
