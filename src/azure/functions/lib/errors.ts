@@ -61,13 +61,3 @@ export function toErrorPayload(
     body: { error: "INTERNAL", message },
   };
 }
-
-/**
- * Generic JSON error response (useful for local debugging, non-host endpoints, etc.).
- * NOTE: For HTTP-trigger custom-handler invocations, prefer returning an InvokeResponse
- * where the error is encoded into the HTTP output binding.
- */
-export function toErrorResponse(err: unknown): Response {
-  const p = toErrorPayload(err);
-  return Response.json(p.body, { status: p.status });
-}

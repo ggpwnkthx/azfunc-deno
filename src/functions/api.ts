@@ -1,4 +1,5 @@
 import { bind, defineFunction } from "@azure/functions";
+import { compileDiagnostics } from "@azure/functions/lib/debug/mod.ts";
 
 export default defineFunction({
   name: "api",
@@ -10,15 +11,14 @@ export default defineFunction({
     }),
     bind.http.output({ name: "res" }),
   ],
-  handler(payload, ctx) {
+  async handler(payload, ctx) {
     const req = payload.Data.req;
     const params = req.Params ?? {};
     const routeRaw = params.route ?? "";
     const route = "/" + routeRaw.replace(/^\/+/, "");
 
     if (route === "/diagnostics" || routeRaw === "diagnostics") {
-      // Diagnostics endpoint - return empty for now
-      return Response.json({ error: "diagnostics not available" });
+      return Response.json(await compileDiagnostics(payload, ctx));
     }
 
     const body = route === "/json" ? { hello: "world" } : {

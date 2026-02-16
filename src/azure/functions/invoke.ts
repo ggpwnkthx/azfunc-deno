@@ -1,3 +1,4 @@
+import { asRecord } from "./lib/util.ts";
 import { AppError } from "./lib/errors.ts";
 import { readStreamTextLimited } from "./lib/streams.ts";
 
@@ -59,55 +60,6 @@ export interface AzureHttpResponseData {
   body?: string;
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === "object" && !Array.isArray(v);
-}
-
-function asRecord(v: unknown, what: string): Record<string, unknown> {
-  if (!isRecord(v)) {
-    throw new AppError("BAD_REQUEST", `Invalid ${what}: expected object.`);
-  }
-  return v;
-}
-
-function isStringArray(v: unknown): v is string[] {
-  return Array.isArray(v) && v.every((x) => typeof x === "string");
-}
-
-function asStringArray(v: unknown, what: string): string[] {
-  if (!isStringArray(v)) {
-    throw new AppError("BAD_REQUEST", `Invalid ${what}: expected string[].`);
-  }
-  return v;
-}
-
-function asStringRecord(v: unknown, what: string): Record<string, string> {
-  const r = asRecord(v, what);
-  const out: Record<string, string> = {};
-  for (const [k, vv] of Object.entries(r)) {
-    if (typeof vv !== "string") {
-      throw new AppError(
-        "BAD_REQUEST",
-        `Invalid ${what}.${k}: expected string.`,
-      );
-    }
-    out[k] = vv;
-  }
-  return out;
-}
-
-function asHeaderRecord(
-  v: unknown,
-  what: string,
-): Record<string, readonly string[]> {
-  const r = asRecord(v, what);
-  const out: Record<string, readonly string[]> = {};
-  for (const [k, vv] of Object.entries(r)) {
-    out[k] = asStringArray(vv, `${what}.${k}`);
-  }
-  return out;
-}
-
 export function parseInvokeRequest(
   payload: unknown,
 ): InvokeRequest<Record<string, JsonValue>, Record<string, JsonValue>> {
@@ -121,37 +73,6 @@ export function parseInvokeRequest(
   return {
     Data: data as unknown as Record<string, JsonValue>,
     Metadata: metadata as unknown as Record<string, JsonValue>,
-  };
-}
-
-export function asAzureHttpRequestData(v: unknown): AzureHttpRequestData {
-  const r = asRecord(v, "Data.<httpTrigger>");
-  const url = r["Url"];
-  const method = r["Method"];
-
-  if (typeof url !== "string" || url.trim() === "") {
-    throw new AppError("BAD_REQUEST", "Invalid Data.<httpTrigger>.Url.");
-  }
-  if (typeof method !== "string" || method.trim() === "") {
-    throw new AppError("BAD_REQUEST", "Invalid Data.<httpTrigger>.Method.");
-  }
-
-  const query = r["Query"];
-  const headers = r["Headers"];
-  const params = r["Params"];
-  const body = r["Body"];
-
-  return {
-    Url: url,
-    Method: method,
-    ...(typeof query === "string" ? { Query: query } : {}),
-    ...(headers !== undefined
-      ? { Headers: asHeaderRecord(headers, "Headers") }
-      : {}),
-    ...(params !== undefined
-      ? { Params: asStringRecord(params, "Params") }
-      : {}),
-    ...(typeof body === "string" ? { Body: body } : {}),
   };
 }
 
